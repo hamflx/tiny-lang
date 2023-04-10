@@ -24,7 +24,51 @@ function findIndex(list, item) {
   };
 }
 
-var Ast = {};
+function $$eval(expr) {
+  var eval_inner = function (_expr, _env) {
+    while(true) {
+      var env = _env;
+      var expr = _expr;
+      switch (expr.TAG | 0) {
+        case /* Cst */0 :
+            return expr._0;
+        case /* Add */1 :
+            return eval_inner(expr._0, env) + eval_inner(expr._1, env) | 0;
+        case /* Mul */2 :
+            return Math.imul(eval_inner(expr._0, env), eval_inner(expr._1, env));
+        case /* Var */3 :
+            return List.assoc(expr._0, env);
+        case /* Let */4 :
+            _env = {
+              hd: [
+                expr._0,
+                eval_inner(expr._1, env)
+              ],
+              tl: env
+            };
+            _expr = expr._2;
+            continue ;
+        case /* Fn */5 :
+        case /* App */6 :
+            throw {
+                  RE_EXN_ID: "Assert_failure",
+                  _1: [
+                    "Demo.res",
+                    31,
+                    13
+                  ],
+                  Error: new Error()
+                };
+        
+      }
+    };
+  };
+  return eval_inner(expr, /* [] */0);
+}
+
+var Ast = {
+  $$eval: $$eval
+};
 
 function compile(expr) {
   var compile_inner = function (expr, cenv) {
@@ -60,6 +104,17 @@ function compile(expr) {
                         tl: cenv
                       })
                 };
+      case /* Fn */5 :
+      case /* App */6 :
+          throw {
+                RE_EXN_ID: "Assert_failure",
+                _1: [
+                  "Demo.res",
+                  55,
+                  13
+                ],
+                Error: new Error()
+              };
       
     }
   };
@@ -152,7 +207,7 @@ var Indexed = {
   compile: compile$1
 };
 
-function $$eval(_instrs, _stk) {
+function $$eval$1(_instrs, _stk) {
   while(true) {
     var stk = _stk;
     var instrs = _instrs;
@@ -237,7 +292,7 @@ function $$eval(_instrs, _stk) {
           RE_EXN_ID: "Assert_failure",
           _1: [
             "Demo.res",
-            95,
+            114,
             11
           ],
           Error: new Error()
@@ -332,6 +387,17 @@ function compile_ast(expr) {
                         }
                       }
                     ]);
+      case /* Fn */5 :
+      case /* App */6 :
+          throw {
+                RE_EXN_ID: "Assert_failure",
+                _1: [
+                  "Demo.res",
+                  143,
+                  13
+                ],
+                Error: new Error()
+              };
       
     }
   };
@@ -470,7 +536,7 @@ function print(instrs) {
 }
 
 var Vm = {
-  $$eval: $$eval,
+  $$eval: $$eval$1,
   find_local_index: find_local_index$1,
   compile_ast: compile_ast,
   compile_nameless: compile_nameless,
@@ -528,9 +594,11 @@ console.log("==> single pass:");
 
 print(instrs2);
 
-console.log($$eval(instrs, /* [] */0));
+console.log($$eval(my_expr));
 
-console.log($$eval(instrs2, /* [] */0));
+console.log($$eval$1(instrs, /* [] */0));
+
+console.log($$eval$1(instrs2, /* [] */0));
 
 export {
   findIndex ,

@@ -15,6 +15,24 @@ module Ast = {
     | Mul(expr, expr)
     | Var(string)
     | Let(string, expr, expr)
+    | Fn(list<string>, expr)
+    | App(expr, list<expr>)
+
+  type senv = list<(string, int)>
+
+  let eval = (expr: expr) => {
+    let rec eval_inner = (expr: expr, env: senv) => {
+      switch expr {
+      | Cst(i) => i
+      | Var(name) => List.assoc(name, env)
+      | Add(a, b) => eval_inner(a, env) + eval_inner(b, env)
+      | Mul(a, b) => eval_inner(a, env) * eval_inner(b, env)
+      | Let(name, a, b) => eval_inner(b, list{(name, eval_inner(a, env)), ...env})
+      | _ => assert false
+      }
+    }
+    eval_inner(expr, list{})
+  }
 }
 
 module Nameless = {
@@ -34,6 +52,7 @@ module Nameless = {
       | Ast.Var(name) => Var(findIndex(cenv, name))
       | Ast.Let(name, e1, e2) =>
         Let(compile_inner(e1, cenv), compile_inner(e2, list{name, ...cenv}))
+      | _ => assert false
       }
     }
     compile_inner(expr, list{})
@@ -121,6 +140,7 @@ module Vm = {
       | Ast.Var(name) => list{Var(find_local_index(env, name))}
       | Ast.Let(name, e1, e2) =>
         list{...compile_inner(e1, env), ...compile_inner(e2, list{Slocal(name), ...env}), Swap, Pop}
+      | _ => assert false
       }
     }
     compile_inner(expr, list{})
@@ -178,5 +198,6 @@ Vm.print(instrs)
 Js.log("==> single pass:")
 Vm.print(instrs2)
 
+Js.log(Ast.eval(my_expr))
 Js.log(Vm.eval(instrs, list{}))
 Js.log(Vm.eval(instrs2, list{}))
