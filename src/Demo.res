@@ -223,10 +223,18 @@ module Native = {
     optimize_rec(instrs)
   }
 
+  let to_little_endian_32 = (i: int): list<int> => {
+    let b1 = i->land(0xff)
+    let b2 = i->lsr(8)->land(0xff)
+    let b3 = i->lsr(16)->land(0xff)
+    let b4 = i->lsr(24)->land(0xff)
+    list{b1, b2, b3, b4}
+  }
+
   let generate = (instrs: instrs) => {
     let generate_instr = (instr: instr) => {
       switch instr {
-      | Mov(reg, Constant(i)) if i < 0xff =>
+      | Mov(reg, Constant(i)) if i < 0x7fffffff =>
         list{
           0x48,
           0xc7,
@@ -237,10 +245,7 @@ module Native = {
           | Rdx => 0xc2
           | _ => assert false
           },
-          i,
-          0x00,
-          0x00,
-          0x00,
+          ...to_little_endian_32(i),
         }
       | Mov(target, RegOffset({base, index, scale: 8, disp})) if disp < 0x80 =>
         switch (base, index) {
@@ -340,7 +345,7 @@ module Native = {
 let my_expr = Ast.Mul(
   Cst(3),
   Ast.Add(
-    Ast.Add(Ast.Cst(1), Ast.Let("x", Ast.Cst(2), Ast.Add(Ast.Var("x"), Ast.Var("x")))),
+    Ast.Add(Ast.Cst(10086), Ast.Let("x", Ast.Cst(2), Ast.Add(Ast.Var("x"), Ast.Var("x")))),
     Ast.Cst(3),
   ),
 )

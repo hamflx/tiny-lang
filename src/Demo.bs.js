@@ -716,6 +716,26 @@ function optimize(instrs) {
   };
 }
 
+function to_little_endian_32(i) {
+  var b1 = i & 255;
+  var b2 = (i >>> 8) & 255;
+  var b3 = (i >>> 16) & 255;
+  var b4 = (i >>> 24) & 255;
+  return {
+          hd: b1,
+          tl: {
+            hd: b2,
+            tl: {
+              hd: b3,
+              tl: {
+                hd: b4,
+                tl: /* [] */0
+              }
+            }
+          }
+        };
+}
+
 function generate(instrs) {
   var generate_instr = function (instr) {
     if (typeof instr === "number") {
@@ -731,7 +751,7 @@ function generate(instrs) {
           switch (i.TAG | 0) {
             case /* Constant */0 :
                 var i$1 = i._0;
-                if (i$1 < 255) {
+                if (i$1 < 2147483647) {
                   var tmp;
                   switch (reg) {
                     case /* Rax */0 :
@@ -751,7 +771,7 @@ function generate(instrs) {
                               RE_EXN_ID: "Assert_failure",
                               _1: [
                                 "Demo.res",
-                                238,
+                                246,
                                 17
                               ],
                               Error: new Error()
@@ -764,19 +784,7 @@ function generate(instrs) {
                             hd: 199,
                             tl: {
                               hd: tmp,
-                              tl: {
-                                hd: i$1,
-                                tl: {
-                                  hd: 0,
-                                  tl: {
-                                    hd: 0,
-                                    tl: {
-                                      hd: 0,
-                                      tl: /* [] */0
-                                    }
-                                  }
-                                }
-                              }
+                              tl: to_little_endian_32(i$1)
                             }
                           }
                         };
@@ -809,7 +817,7 @@ function generate(instrs) {
                                   RE_EXN_ID: "Assert_failure",
                                   _1: [
                                     "Demo.res",
-                                    256,
+                                    261,
                                     19
                                   ],
                                   Error: new Error()
@@ -835,7 +843,7 @@ function generate(instrs) {
                                   RE_EXN_ID: "Assert_failure",
                                   _1: [
                                     "Demo.res",
-                                    263,
+                                    268,
                                     19
                                   ],
                                   Error: new Error()
@@ -863,7 +871,7 @@ function generate(instrs) {
                           RE_EXN_ID: "Assert_failure",
                           _1: [
                             "Demo.res",
-                            267,
+                            272,
                             15
                           ],
                           Error: new Error()
@@ -963,7 +971,7 @@ function generate(instrs) {
           RE_EXN_ID: "Assert_failure",
           _1: [
             "Demo.res",
-            280,
+            285,
             13
           ],
           Error: new Error()
@@ -1051,6 +1059,7 @@ function print$1(instrs) {
 var Native = {
   compile_vm: compile_vm,
   optimize: optimize,
+  to_little_endian_32: to_little_endian_32,
   generate: generate,
   to_hex: to_hex,
   to_reg_str: to_reg_str,
@@ -1070,7 +1079,7 @@ var my_expr = {
       TAG: /* Add */1,
       _0: {
         TAG: /* Cst */0,
-        _0: 1
+        _0: 10086
       },
       _1: {
         TAG: /* Let */4,
