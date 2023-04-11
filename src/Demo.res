@@ -146,16 +146,6 @@ module Vm = {
     compile_inner(expr, list{})
   }
 
-  let rec compile_nameless = (expr: Nameless.expr): instrs => {
-    switch expr {
-    | Nameless.Cst(i) => list{Cst(i)}
-    | Nameless.Add(e1, e2) => list{...compile_nameless(e1), ...compile_nameless(e2), Add}
-    | Nameless.Mul(e1, e2) => list{...compile_nameless(e1), ...compile_nameless(e2), Mul}
-    | Nameless.Var(i) => list{Var(i)}
-    | Nameless.Let(e1, e2) => list{...compile_nameless(e1), ...compile_nameless(e2), Swap, Pop}
-    }
-  }
-
   let rec compile_indexed = (expr: Indexed.expr): instrs => {
     switch expr {
     | Indexed.Cst(i) => list{Cst(i)}

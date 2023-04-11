@@ -405,58 +405,6 @@ function compile_ast(expr) {
   return compile_inner(expr, /* [] */0);
 }
 
-function compile_nameless(expr) {
-  switch (expr.TAG | 0) {
-    case /* Cst */0 :
-        return {
-                hd: {
-                  TAG: /* Cst */0,
-                  _0: expr._0
-                },
-                tl: /* [] */0
-              };
-    case /* Add */1 :
-        return Belt_List.concatMany([
-                    compile_nameless(expr._0),
-                    compile_nameless(expr._1),
-                    {
-                      hd: /* Add */0,
-                      tl: /* [] */0
-                    }
-                  ]);
-    case /* Mul */2 :
-        return Belt_List.concatMany([
-                    compile_nameless(expr._0),
-                    compile_nameless(expr._1),
-                    {
-                      hd: /* Mul */1,
-                      tl: /* [] */0
-                    }
-                  ]);
-    case /* Var */3 :
-        return {
-                hd: {
-                  TAG: /* Var */1,
-                  _0: expr._0
-                },
-                tl: /* [] */0
-              };
-    case /* Let */4 :
-        return Belt_List.concatMany([
-                    compile_nameless(expr._0),
-                    compile_nameless(expr._1),
-                    {
-                      hd: /* Swap */3,
-                      tl: {
-                        hd: /* Pop */2,
-                        tl: /* [] */0
-                      }
-                    }
-                  ]);
-    
-  }
-}
-
 function compile_indexed(expr) {
   switch (expr.TAG | 0) {
     case /* Cst */0 :
@@ -540,7 +488,6 @@ var Vm = {
   $$eval: $$eval$1,
   find_local_index: find_local_index$1,
   compile_ast: compile_ast,
-  compile_nameless: compile_nameless,
   compile_indexed: compile_indexed,
   print: print
 };
@@ -804,7 +751,7 @@ function generate(instrs) {
                               RE_EXN_ID: "Assert_failure",
                               _1: [
                                 "Demo.res",
-                                248,
+                                238,
                                 17
                               ],
                               Error: new Error()
@@ -862,7 +809,7 @@ function generate(instrs) {
                                   RE_EXN_ID: "Assert_failure",
                                   _1: [
                                     "Demo.res",
-                                    266,
+                                    256,
                                     19
                                   ],
                                   Error: new Error()
@@ -888,7 +835,7 @@ function generate(instrs) {
                                   RE_EXN_ID: "Assert_failure",
                                   _1: [
                                     "Demo.res",
-                                    273,
+                                    263,
                                     19
                                   ],
                                   Error: new Error()
@@ -916,7 +863,7 @@ function generate(instrs) {
                           RE_EXN_ID: "Assert_failure",
                           _1: [
                             "Demo.res",
-                            277,
+                            267,
                             15
                           ],
                           Error: new Error()
@@ -1016,7 +963,7 @@ function generate(instrs) {
           RE_EXN_ID: "Assert_failure",
           _1: [
             "Demo.res",
-            290,
+            280,
             13
           ],
           Error: new Error()
