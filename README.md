@@ -1,21 +1,11 @@
-# ReScript Project Template
+# tiny-lang
 
-The only official ReScript starter template.
-
-## Installation
-
-```sh
-npm install
+```
+npm run res:build
+node src/Demo.bs.js
+cargo run
 ```
 
-## Build
-
-- Build: `npm run res:build`
-- Clean: `npm run res:clean`
-- Build & watch: `npm run res:dev`
-
-## Run
-
-```sh
-node src/Demo.bs.js
+```
+objdump -D -Mintel,x86-64 -b binary -m i386 machine_code.bin
 ```
