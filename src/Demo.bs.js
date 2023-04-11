@@ -545,44 +545,51 @@ var Vm = {
   print: print
 };
 
-function find_local_index$2(env, name) {
-  var _env = env;
-  var _stack_index = 0;
-  while(true) {
-    var stack_index = _stack_index;
-    var env$1 = _env;
-    if (env$1) {
-      var head = env$1.hd;
-      if (head) {
-        if (head._0 === name) {
-          return stack_index;
-        }
-        _stack_index = stack_index + 1 | 0;
-        _env = env$1.tl;
-        continue ;
-      }
-      _stack_index = stack_index + 1 | 0;
-      _env = env$1.tl;
-      continue ;
+function compile_vm(instrs) {
+  var compile_inner = function (instrs) {
+    if (!instrs) {
+      return /* [] */0;
     }
-    throw {
-          RE_EXN_ID: "Not_found",
-          Error: new Error()
-        };
-  };
-}
-
-function compile_ast$1(expr) {
-  var compile_inner = function (expr, env) {
-    switch (expr.TAG | 0) {
-      case /* Cst */0 :
-          return {
+    var i = instrs.hd;
+    if (typeof i !== "number") {
+      if (i.TAG === /* Cst */0) {
+        return {
+                hd: {
+                  TAG: /* Mov */0,
+                  _0: /* Rax */0,
+                  _1: {
+                    TAG: /* Constant */0,
+                    _0: i._0
+                  }
+                },
+                tl: {
+                  hd: {
+                    TAG: /* Push */1,
+                    _0: /* Rax */0
+                  },
+                  tl: compile_inner(instrs.tl)
+                }
+              };
+      } else {
+        return {
+                hd: {
+                  TAG: /* Mov */0,
+                  _0: /* Rbx */1,
+                  _1: {
+                    TAG: /* Constant */0,
+                    _0: i._0
+                  }
+                },
+                tl: {
                   hd: {
                     TAG: /* Mov */0,
                     _0: /* Rax */0,
                     _1: {
-                      TAG: /* Constant */0,
-                      _0: expr._0
+                      TAG: /* RegOffset */3,
+                      base: /* Rsp */4,
+                      index: /* Rbx */1,
+                      scale: 8,
+                      disp: 0
                     }
                   },
                   tl: {
@@ -590,153 +597,127 @@ function compile_ast$1(expr) {
                       TAG: /* Push */1,
                       _0: /* Rax */0
                     },
-                    tl: /* [] */0
+                    tl: compile_inner(instrs.tl)
                   }
-                };
-      case /* Add */1 :
-          return Belt_List.concatMany([
-                      compile_inner(expr._0, env),
-                      compile_inner(expr._1, {
-                            hd: /* Stmp */0,
-                            tl: env
-                          }),
-                      {
-                        hd: {
-                          TAG: /* Pop */2,
-                          _0: /* Rax */0
-                        },
-                        tl: {
-                          hd: {
-                            TAG: /* Pop */2,
-                            _0: /* Rbx */1
-                          },
-                          tl: {
-                            hd: {
-                              TAG: /* Add */3,
-                              _0: /* Rax */0,
-                              _1: /* Rbx */1
-                            },
-                            tl: {
-                              hd: {
-                                TAG: /* Push */1,
-                                _0: /* Rax */0
-                              },
-                              tl: /* [] */0
-                            }
-                          }
-                        }
-                      }
-                    ]);
-      case /* Mul */2 :
-          return Belt_List.concatMany([
-                      compile_inner(expr._0, env),
-                      compile_inner(expr._1, {
-                            hd: /* Stmp */0,
-                            tl: env
-                          }),
-                      {
-                        hd: {
-                          TAG: /* Pop */2,
-                          _0: /* Rax */0
-                        },
-                        tl: {
-                          hd: {
-                            TAG: /* Pop */2,
-                            _0: /* Rbx */1
-                          },
-                          tl: {
-                            hd: {
-                              TAG: /* Mul */4,
-                              _0: /* Rax */0,
-                              _1: /* Rbx */1
-                            },
-                            tl: {
-                              hd: {
-                                TAG: /* Push */1,
-                                _0: /* Rax */0
-                              },
-                              tl: /* [] */0
-                            }
-                          }
-                        }
-                      }
-                    ]);
-      case /* Var */3 :
+                }
+              };
+      }
+    }
+    switch (i) {
+      case /* Add */0 :
           return {
                   hd: {
-                    TAG: /* Mov */0,
-                    _0: /* Rbx */1,
-                    _1: {
-                      TAG: /* Constant */0,
-                      _0: find_local_index$2(env, expr._0)
-                    }
+                    TAG: /* Pop */2,
+                    _0: /* Rax */0
                   },
                   tl: {
                     hd: {
-                      TAG: /* Mov */0,
-                      _0: /* Rax */0,
-                      _1: {
-                        TAG: /* RegOffset */3,
-                        base: /* Rsp */4,
-                        index: /* Rbx */1,
-                        scale: 8,
-                        disp: 0
+                      TAG: /* Pop */2,
+                      _0: /* Rbx */1
+                    },
+                    tl: {
+                      hd: {
+                        TAG: /* Add */3,
+                        _0: /* Rax */0,
+                        _1: /* Rbx */1
+                      },
+                      tl: {
+                        hd: {
+                          TAG: /* Push */1,
+                          _0: /* Rax */0
+                        },
+                        tl: compile_inner(instrs.tl)
                       }
+                    }
+                  }
+                };
+      case /* Mul */1 :
+          return {
+                  hd: {
+                    TAG: /* Pop */2,
+                    _0: /* Rax */0
+                  },
+                  tl: {
+                    hd: {
+                      TAG: /* Pop */2,
+                      _0: /* Rbx */1
+                    },
+                    tl: {
+                      hd: {
+                        TAG: /* Mul */4,
+                        _0: /* Rbx */1
+                      },
+                      tl: {
+                        hd: {
+                          TAG: /* Push */1,
+                          _0: /* Rax */0
+                        },
+                        tl: compile_inner(instrs.tl)
+                      }
+                    }
+                  }
+                };
+      case /* Pop */2 :
+          return {
+                  hd: {
+                    TAG: /* Pop */2,
+                    _0: /* Rax */0
+                  },
+                  tl: compile_inner(instrs.tl)
+                };
+      case /* Swap */3 :
+          var tail = instrs.tl;
+          if (tail && tail.hd === 2) {
+            return {
+                    hd: {
+                      TAG: /* Pop */2,
+                      _0: /* Rax */0
+                    },
+                    tl: {
+                      hd: {
+                        TAG: /* Pop */2,
+                        _0: /* Rbx */1
+                      },
+                      tl: {
+                        hd: {
+                          TAG: /* Push */1,
+                          _0: /* Rax */0
+                        },
+                        tl: compile_inner(tail.tl)
+                      }
+                    }
+                  };
+          }
+          return {
+                  hd: {
+                    TAG: /* Pop */2,
+                    _0: /* Rax */0
+                  },
+                  tl: {
+                    hd: {
+                      TAG: /* Pop */2,
+                      _0: /* Rbx */1
                     },
                     tl: {
                       hd: {
                         TAG: /* Push */1,
                         _0: /* Rax */0
                       },
-                      tl: /* [] */0
+                      tl: {
+                        hd: {
+                          TAG: /* Push */1,
+                          _0: /* Rbx */1
+                        },
+                        tl: compile_inner(tail)
+                      }
                     }
                   }
                 };
-      case /* Let */4 :
-          return Belt_List.concatMany([
-                      compile_inner(expr._1, env),
-                      compile_inner(expr._2, {
-                            hd: /* Slocal */{
-                              _0: expr._0
-                            },
-                            tl: env
-                          }),
-                      {
-                        hd: {
-                          TAG: /* Pop */2,
-                          _0: /* Rax */0
-                        },
-                        tl: {
-                          hd: {
-                            TAG: /* Pop */2,
-                            _0: /* Rbx */1
-                          },
-                          tl: {
-                            hd: {
-                              TAG: /* Push */1,
-                              _0: /* Rax */0
-                            },
-                            tl: /* [] */0
-                          }
-                        }
-                      }
-                    ]);
-      case /* Fn */5 :
-      case /* App */6 :
-          throw {
-                RE_EXN_ID: "Assert_failure",
-                _1: [
-                  "Demo.res",
-                  241,
-                  13
-                ],
-                Error: new Error()
-              };
       
     }
   };
   return Belt_List.concatMany([
-              compile_inner(expr, /* [] */0),
+              compile_inner(instrs),
               {
                 hd: {
                   TAG: /* Pop */2,
@@ -748,6 +729,44 @@ function compile_ast$1(expr) {
                 }
               }
             ]);
+}
+
+function optimize(instrs) {
+  var optimize_inner = function (_instrs) {
+    while(true) {
+      var instrs = _instrs;
+      if (!instrs) {
+        return /* [] */0;
+      }
+      var head = instrs.hd;
+      if (typeof head !== "number" && head.TAG === /* Push */1 && head._0 === 0) {
+        var match = instrs.tl;
+        if (match) {
+          var match$1 = match.hd;
+          if (typeof match$1 !== "number" && match$1.TAG === /* Pop */2 && match$1._0 === 0) {
+            _instrs = match.tl;
+            continue ;
+          }
+          
+        }
+        
+      }
+      return {
+              hd: head,
+              tl: optimize_inner(instrs.tl)
+            };
+    };
+  };
+  var _instrs = instrs;
+  while(true) {
+    var instrs$1 = _instrs;
+    var o = optimize_inner(instrs$1);
+    if (Belt_List.length(o) === Belt_List.length(instrs$1)) {
+      return o;
+    }
+    _instrs = o;
+    continue ;
+  };
 }
 
 function generate(instrs) {
@@ -785,7 +804,7 @@ function generate(instrs) {
                               RE_EXN_ID: "Assert_failure",
                               _1: [
                                 "Demo.res",
-                                259,
+                                248,
                                 17
                               ],
                               Error: new Error()
@@ -843,7 +862,7 @@ function generate(instrs) {
                                   RE_EXN_ID: "Assert_failure",
                                   _1: [
                                     "Demo.res",
-                                    277,
+                                    266,
                                     19
                                   ],
                                   Error: new Error()
@@ -869,7 +888,7 @@ function generate(instrs) {
                                   RE_EXN_ID: "Assert_failure",
                                   _1: [
                                     "Demo.res",
-                                    284,
+                                    273,
                                     19
                                   ],
                                   Error: new Error()
@@ -897,7 +916,7 @@ function generate(instrs) {
                           RE_EXN_ID: "Assert_failure",
                           _1: [
                             "Demo.res",
-                            288,
+                            277,
                             15
                           ],
                           Error: new Error()
@@ -978,6 +997,18 @@ function generate(instrs) {
           }
           break;
       case /* Mul */4 :
+          if (instr._0 === 1) {
+            return {
+                    hd: 72,
+                    tl: {
+                      hd: 247,
+                      tl: {
+                        hd: 227,
+                        tl: /* [] */0
+                      }
+                    }
+                  };
+          }
           break;
       
     }
@@ -985,7 +1016,7 @@ function generate(instrs) {
           RE_EXN_ID: "Assert_failure",
           _1: [
             "Demo.res",
-            300,
+            290,
             13
           ],
           Error: new Error()
@@ -1061,7 +1092,7 @@ function print$1(instrs) {
             instr_text = "add " + to_reg_str(reg._0) + ", " + to_reg_str(reg._1);
             break;
         case /* Mul */4 :
-            instr_text = "mul " + to_reg_str(reg._0) + ", " + to_reg_str(reg._1);
+            instr_text = "mul " + to_reg_str(reg._0);
             break;
         
       }
@@ -1071,8 +1102,8 @@ function print$1(instrs) {
 }
 
 var Native = {
-  find_local_index: find_local_index$2,
-  compile_ast: compile_ast$1,
+  compile_vm: compile_vm,
+  optimize: optimize,
   generate: generate,
   to_hex: to_hex,
   to_reg_str: to_reg_str,
@@ -1081,36 +1112,43 @@ var Native = {
 };
 
 var my_expr = {
-  TAG: /* Add */1,
+  TAG: /* Mul */2,
   _0: {
-    TAG: /* Add */1,
-    _0: {
-      TAG: /* Cst */0,
-      _0: 1
-    },
-    _1: {
-      TAG: /* Let */4,
-      _0: "x",
-      _1: {
-        TAG: /* Cst */0,
-        _0: 2
-      },
-      _2: {
-        TAG: /* Add */1,
-        _0: {
-          TAG: /* Var */3,
-          _0: "x"
-        },
-        _1: {
-          TAG: /* Var */3,
-          _0: "x"
-        }
-      }
-    }
-  },
-  _1: {
     TAG: /* Cst */0,
     _0: 3
+  },
+  _1: {
+    TAG: /* Add */1,
+    _0: {
+      TAG: /* Add */1,
+      _0: {
+        TAG: /* Cst */0,
+        _0: 1
+      },
+      _1: {
+        TAG: /* Let */4,
+        _0: "x",
+        _1: {
+          TAG: /* Cst */0,
+          _0: 2
+        },
+        _2: {
+          TAG: /* Add */1,
+          _0: {
+            TAG: /* Var */3,
+            _0: "x"
+          },
+          _1: {
+            TAG: /* Var */3,
+            _0: "x"
+          }
+        }
+      }
+    },
+    _1: {
+      TAG: /* Cst */0,
+      _0: 3
+    }
   }
 };
 
@@ -1122,7 +1160,7 @@ var instrs = compile_indexed(my_indexed);
 
 var instrs2 = compile_ast(my_expr);
 
-var assembly = compile_ast$1(my_expr);
+var assembly = optimize(compile_vm(instrs2));
 
 console.log("==> multi-level ir:");
 

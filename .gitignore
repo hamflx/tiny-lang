@@ -5,6 +5,7 @@
 .merlin
 
 /machine_code.bin
+/test.o
 
 # Added by cargo
 

@@ -185,63 +185,52 @@ module Native = {
   type reg = Rax | Rbx | Rcx | Rdx | Rsp
   type mov_arg =
     Constant(int) | Reg(reg) | Addr(int) | RegOffset({base: reg, index: reg, scale: int, disp: int})
-  type instr = Mov(reg, mov_arg) | Push(reg) | Pop(reg) | Add(reg, reg) | Mul(reg, reg) | Ret
+  type instr = Mov(reg, mov_arg) | Push(reg) | Pop(reg) | Add(reg, reg) | Mul(reg) | Ret
   type instrs = list<instr>
 
-  type sv = Slocal(string) | Stmp
-  type senv = list<sv>
-
-  let find_local_index = (env: senv, name: string) => {
-    let rec find_recursive = (env: senv, stack_index: int) => {
-      switch env {
-      | list{Slocal(head), ..._} if head === name => stack_index
-      | list{_, ...tail} => find_recursive(tail, stack_index + 1)
-      | _ => raise(Not_found)
-      }
-    }
-    find_recursive(env, 0)
-  }
-
-  let compile_ast = (expr: Ast.expr): instrs => {
-    let rec compile_inner = (expr: Ast.expr, env: senv): instrs => {
-      switch expr {
-      | Ast.Cst(i) => list{Mov(Rax, Constant(i)), Push(Rax)}
-      | Ast.Add(e1, e2) =>
+  let compile_vm = (instrs: Vm.instrs): instrs => {
+    let rec compile_inner = (instrs: Vm.instrs): instrs => {
+      switch instrs {
+      | list{} => list{}
+      | list{Vm.Cst(i), ...tail} => list{Mov(Rax, Constant(i)), Push(Rax), ...compile_inner(tail)}
+      | list{Vm.Add, ...tail} =>
+        list{Pop(Rax), Pop(Rbx), Add(Rax, Rbx), Push(Rax), ...compile_inner(tail)}
+      | list{Vm.Mul, ...tail} =>
+        list{Pop(Rax), Pop(Rbx), Mul(Rbx), Push(Rax), ...compile_inner(tail)}
+      | list{Vm.Var(i), ...tail} =>
         list{
-          ...compile_inner(e1, env),
-          ...compile_inner(e2, list{Stmp, ...env}),
-          Pop(Rax),
-          Pop(Rbx),
-          Add(Rax, Rbx),
-          Push(Rax),
-        }
-      | Ast.Mul(e1, e2) =>
-        list{
-          ...compile_inner(e1, env),
-          ...compile_inner(e2, list{Stmp, ...env}),
-          Pop(Rax),
-          Pop(Rbx),
-          Mul(Rax, Rbx),
-          Push(Rax),
-        }
-      | Ast.Var(name) =>
-        list{
-          Mov(Rbx, Constant(find_local_index(env, name))),
+          Mov(Rbx, Constant(i)),
           Mov(Rax, RegOffset({base: Rsp, index: Rbx, scale: 8, disp: 0})),
           Push(Rax),
+          ...compile_inner(tail),
         }
-      | Ast.Let(name, e1, e2) =>
-        list{
-          ...compile_inner(e1, env),
-          ...compile_inner(e2, list{Slocal(name), ...env}),
-          Pop(Rax),
-          Pop(Rbx),
-          Push(Rax),
-        }
-      | _ => assert false
+      | list{Vm.Swap, Vm.Pop, ...tail} =>
+        list{Pop(Rax), Pop(Rbx), Push(Rax), ...compile_inner(tail)}
+      | list{Vm.Pop, ...tail} => list{Pop(Rax), ...compile_inner(tail)}
+      | list{Vm.Swap, ...tail} =>
+        list{Pop(Rax), Pop(Rbx), Push(Rax), Push(Rbx), ...compile_inner(tail)}
       }
     }
-    list{...compile_inner(expr, list{}), Pop(Rax), Ret}
+    list{...compile_inner(instrs), Pop(Rax), Ret}
+  }
+
+  let optimize = (instrs: instrs) => {
+    let rec optimize_inner = (instrs: instrs) => {
+      switch instrs {
+      | list{Push(Rax), Pop(Rax), ...tail} => optimize_inner(tail)
+      | list{head, ...tail} => list{head, ...optimize_inner(tail)}
+      | list{} => list{}
+      }
+    }
+    let rec optimize_rec = (instrs: instrs) => {
+      let o = optimize_inner(instrs)
+      if Belt.List.length(o) === Belt.List.length(instrs) {
+        o
+      } else {
+        optimize_rec(o)
+      }
+    }
+    optimize_rec(instrs)
   }
 
   let generate = (instrs: instrs) => {
@@ -296,6 +285,7 @@ module Native = {
       | Pop(Rcx) => list{0x59}
       | Pop(Rdx) => list{0x5a}
       | Add(Rax, Rbx) => list{0x48, 0x01, 0xd8}
+      | Mul(Rbx) => list{0x48, 0xf7, 0xe3}
       | Ret => list{0xc3}
       | _ => assert false
       }
@@ -349,7 +339,7 @@ module Native = {
       | Push(reg) => "push " ++ to_reg_str(reg)
       | Pop(reg) => "pop " ++ to_reg_str(reg)
       | Add(r1, r2) => "add " ++ to_reg_str(r1) ++ ", " ++ to_reg_str(r2)
-      | Mul(r1, r2) => "mul " ++ to_reg_str(r1) ++ ", " ++ to_reg_str(r2)
+      | Mul(reg) => "mul " ++ to_reg_str(reg)
       | Ret => "ret"
       }
       Js.log(instr_text)
@@ -357,9 +347,12 @@ module Native = {
   }
 }
 
-let my_expr = Ast.Add(
-  Ast.Add(Ast.Cst(1), Ast.Let("x", Ast.Cst(2), Ast.Add(Ast.Var("x"), Ast.Var("x")))),
-  Ast.Cst(3),
+let my_expr = Ast.Mul(
+  Cst(3),
+  Ast.Add(
+    Ast.Add(Ast.Cst(1), Ast.Let("x", Ast.Cst(2), Ast.Add(Ast.Var("x"), Ast.Var("x")))),
+    Ast.Cst(3),
+  ),
 )
 
 let my_nameless = Nameless.compile(my_expr)
@@ -368,7 +361,7 @@ let instrs = Vm.compile_indexed(my_indexed)
 
 let instrs2 = Vm.compile_ast(my_expr)
 
-let assembly = Native.compile_ast(my_expr)
+let assembly = Native.optimize(Native.compile_vm(instrs2))
 
 Js.log("==> multi-level ir:")
 Vm.print(instrs)
