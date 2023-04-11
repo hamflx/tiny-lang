@@ -3,3 +3,9 @@
 /lib/
 .bsb.lock
 .merlin
+
+/machine_code.bin
+
+# Added by cargo
+
+/target
