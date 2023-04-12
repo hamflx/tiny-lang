@@ -207,10 +207,12 @@ function compile(expr) {
                       })
                 };
       case /* Fn */5 :
+          var params = expr._0;
           return {
                   TAG: /* Fn */5,
-                  _0: compile_inner(expr._1, Belt_List.concatMany([
-                            expr._0,
+                  _0: Belt_List.length(params),
+                  _1: compile_inner(expr._1, Belt_List.concatMany([
+                            params,
                             env
                           ]))
                 };
@@ -242,11 +244,11 @@ function print(expr) {
       case /* Let */4 :
           return "let v0 = (" + go(expr._0) + ") in (" + go(expr._1) + ")";
       case /* Fn */5 :
-          return "fn(" + go(expr._0) + ")";
+          return "fn(" + go(expr._1) + ")";
       case /* App */6 :
-          return "app( ( " + go(expr._0) + " ), ( " + Belt_List.reduce(Belt_List.map(expr._1, go), "", (function (list, item) {
-                        return list + "(" + item + "), ";
-                      })) + " ) )";
+          return "app( " + go(expr._0) + Belt_List.reduce(Belt_List.map(expr._1, go), "", (function (list, item) {
+                        return list + ", (" + item + "), ";
+                      })) + " )";
       
     }
   };
@@ -267,18 +269,16 @@ function find_local_index(env, local_index) {
     var local_index$1 = _local_index;
     var env$1 = _env;
     if (env$1) {
-      if (local_index$1 !== 0) {
-        throw {
-              RE_EXN_ID: "Not_found",
-              Error: new Error()
-            };
+      if (env$1.hd) {
+        _stack_index = stack_index + 1 | 0;
+        _env = env$1.tl;
+        continue ;
       }
-      var head = env$1.hd;
-      if (head === /* Slocal */0) {
+      if (local_index$1 === 0) {
         return stack_index;
       }
       _stack_index = stack_index + 1 | 0;
-      _local_index = head === /* Slocal */0 ? local_index$1 - 1 | 0 : local_index$1;
+      _local_index = local_index$1 - 1 | 0;
       _env = env$1.tl;
       continue ;
     }
@@ -332,27 +332,56 @@ function compile$1(expr) {
       case /* Fn */5 :
           return {
                   TAG: /* Fn */5,
-                  _0: go(expr._0, env)
+                  _0: go(expr._1, Belt_List.concatMany([
+                            Belt_List.makeBy(expr._0, (function (param) {
+                                    return /* Slocal */0;
+                                  })),
+                            env
+                          ]))
                 };
       case /* App */6 :
-          throw {
-                RE_EXN_ID: "Match_failure",
-                _1: [
-                  "Demo.res",
-                  142,
-                  6
-                ],
-                Error: new Error()
-              };
+          return {
+                  TAG: /* App */6,
+                  _0: go(expr._0, env),
+                  _1: Belt_List.map(expr._1, (function (item) {
+                          return go(item, env);
+                        }))
+                };
       
     }
   };
   return go(expr, /* [] */0);
 }
 
+function print$1(expr) {
+  var go = function (expr) {
+    switch (expr.TAG | 0) {
+      case /* Cst */0 :
+          return String(expr._0);
+      case /* Add */1 :
+          return "(" + go(expr._0) + ") + (" + go(expr._1) + ")";
+      case /* Mul */2 :
+          return "(" + go(expr._0) + ") * (" + go(expr._1) + ")";
+      case /* Var */3 :
+          return "var" + String(expr._0);
+      case /* Let */4 :
+          return "let v0 = (" + go(expr._0) + ") in (" + go(expr._1) + ")";
+      case /* Fn */5 :
+          return "fn(" + go(expr._0) + ")";
+      case /* App */6 :
+          return "app( " + go(expr._0) + ", " + Belt_List.reduce(Belt_List.map(expr._1, go), "", (function (list, item) {
+                        return list + "(" + item + "), ";
+                      })) + " )";
+      
+    }
+  };
+  return go(expr);
+}
+
 var Indexed = {
   find_local_index: find_local_index,
-  compile: compile$1
+  compile: compile$1,
+  print: print$1
 };
 
 function $$eval$1(_instrs, _stk) {
@@ -440,7 +469,7 @@ function $$eval$1(_instrs, _stk) {
           RE_EXN_ID: "Assert_failure",
           _1: [
             "Demo.res",
-            170,
+            192,
             11
           ],
           Error: new Error()
@@ -541,7 +570,7 @@ function compile_ast(expr) {
                 RE_EXN_ID: "Assert_failure",
                 _1: [
                   "Demo.res",
-                  199,
+                  221,
                   13
                 ],
                 Error: new Error()
@@ -606,7 +635,7 @@ function compile_indexed(expr) {
               RE_EXN_ID: "Match_failure",
               _1: [
                 "Demo.res",
-                206,
+                228,
                 4
               ],
               Error: new Error()
@@ -615,7 +644,7 @@ function compile_indexed(expr) {
   }
 }
 
-function print$1(instrs) {
+function print$2(instrs) {
   for(var i = 1 ,i_finish = List.length(instrs); i <= i_finish; ++i){
     var i$1 = List.nth(instrs, i - 1 | 0);
     var instr_text;
@@ -647,7 +676,7 @@ var Vm = {
   find_local_index: find_local_index$1,
   compile_ast: compile_ast,
   compile_indexed: compile_indexed,
-  print: print$1
+  print: print$2
 };
 
 function compile_vm(instrs) {
@@ -929,7 +958,7 @@ function generate(instrs) {
                               RE_EXN_ID: "Assert_failure",
                               _1: [
                                 "Demo.res",
-                                302,
+                                324,
                                 17
                               ],
                               Error: new Error()
@@ -975,7 +1004,7 @@ function generate(instrs) {
                                   RE_EXN_ID: "Assert_failure",
                                   _1: [
                                     "Demo.res",
-                                    317,
+                                    339,
                                     19
                                   ],
                                   Error: new Error()
@@ -1001,7 +1030,7 @@ function generate(instrs) {
                                   RE_EXN_ID: "Assert_failure",
                                   _1: [
                                     "Demo.res",
-                                    324,
+                                    346,
                                     19
                                   ],
                                   Error: new Error()
@@ -1029,7 +1058,7 @@ function generate(instrs) {
                           RE_EXN_ID: "Assert_failure",
                           _1: [
                             "Demo.res",
-                            328,
+                            350,
                             15
                           ],
                           Error: new Error()
@@ -1129,7 +1158,7 @@ function generate(instrs) {
           RE_EXN_ID: "Assert_failure",
           _1: [
             "Demo.res",
-            341,
+            363,
             13
           ],
           Error: new Error()
@@ -1184,7 +1213,7 @@ function to_mov_arg_str(reg) {
   }
 }
 
-function print$2(instrs) {
+function print$3(instrs) {
   for(var i = 1 ,i_finish = List.length(instrs); i <= i_finish; ++i){
     var reg = List.nth(instrs, i - 1 | 0);
     var instr_text;
@@ -1222,7 +1251,7 @@ var Native = {
   to_hex: to_hex,
   to_reg_str: to_reg_str,
   to_mov_arg_str: to_mov_arg_str,
-  print: print$2
+  print: print$3
 };
 
 var my_expr = {
@@ -1306,17 +1335,9 @@ console.log(print(my_nameless));
 
 var my_indexed = compile$1(my_nameless);
 
-var instrs = compile_indexed(my_indexed);
+console.log("==> Indexed:");
 
-var instrs2 = compile_ast(my_expr);
-
-console.log("==> multi-level ir:");
-
-print$1(instrs);
-
-console.log("==> single pass:");
-
-print$1(instrs2);
+console.log(print$1(my_indexed));
 
 console.log($$eval(my_expr));
 
@@ -1330,7 +1351,5 @@ export {
   my_expr ,
   my_nameless ,
   my_indexed ,
-  instrs ,
-  instrs2 ,
 }
 /* my_nameless Not a pure module */

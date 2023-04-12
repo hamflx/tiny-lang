@@ -71,7 +71,7 @@ module Nameless = {
     | Mul(expr, expr)
     | Var(int)
     | Let(expr, expr)
-    | Fn(expr)
+    | Fn(int, expr)
     | App(expr, list<expr>)
 
   let compile = (expr: Ast.expr): expr => {
@@ -82,7 +82,8 @@ module Nameless = {
       | Ast.Mul(a, b) => Mul(compile_inner(a, env), compile_inner(b, env))
       | Ast.Var(name) => Var(findIndex(env, name))
       | Ast.Let(name, e1, e2) => Let(compile_inner(e1, env), compile_inner(e2, list{name, ...env}))
-      | Ast.Fn(params, body) => Fn(compile_inner(body, list{...params, ...env}))
+      | Ast.Fn(params, body) =>
+        Fn(Belt.List.length(params), compile_inner(body, list{...params, ...env}))
       | Ast.App(fn, args) =>
         App(compile_inner(fn, env), args->Belt.List.map(item => compile_inner(item, env)))
       }
@@ -98,14 +99,13 @@ module Nameless = {
       | Mul(a, b) => "(" ++ go(a) ++ ") * (" ++ go(b) ++ ")"
       | Var(i) => "var" ++ Belt.Int.toString(i)
       | Let(e1, e2) => "let v0 = (" ++ go(e1) ++ ") in (" ++ go(e2) ++ ")"
-      | Fn(e) => "fn(" ++ go(e) ++ ")"
+      | Fn(_, e) => "fn(" ++ go(e) ++ ")"
       | App(e, args) =>
-        "app( ( " ++
+        "app( " ++
         go(e) ++
-        " ), ( " ++
         args
         ->Belt.List.map(item => go(item))
-        ->Belt.List.reduce("", (list, item) => list ++ "(" ++ item ++ "), ") ++ " ) )"
+        ->Belt.List.reduce("", (list, item) => list ++ ", (" ++ item ++ "), ") ++ " )"
       }
     }
     go(expr)
@@ -128,9 +128,9 @@ module Indexed = {
   let find_local_index = (env: senv, local_index: int) => {
     let rec findWithIndex = (env: senv, local_index: int, stack_index: int) => {
       switch (env, local_index) {
-      | (list{head, ..._}, 0) if head === Slocal => stack_index
-      | (list{head, ...tail}, 0) =>
-        findWithIndex(tail, head === Slocal ? local_index - 1 : local_index, stack_index + 1)
+      | (list{Slocal, ..._}, 0) => stack_index
+      | (list{Slocal, ...tail}, _) => findWithIndex(tail, local_index - 1, stack_index + 1)
+      | (list{_, ...tail}, _) => findWithIndex(tail, local_index, stack_index + 1)
       | _ => raise(Not_found)
       }
     }
@@ -145,13 +145,32 @@ module Indexed = {
       | Nameless.Mul(a, b) => Mul(go(a, env), go(b, list{Stmp, ...env}))
       | Nameless.Var(i) => Var(find_local_index(env, i))
       | Nameless.Let(e1, e2) => Let(go(e1, env), go(e2, list{Slocal, ...env}))
-      | Nameless.Fn(e) => Fn(go(e, env))
-      | Nameless.App(e, args) => {
-          // go(e)
-        }
+      | Nameless.Fn(size, e) => Fn(go(e, list{...Belt.List.makeBy(size, _ => Slocal), ...env}))
+      | Nameless.App(e, args) => App(go(e, env), args->Belt.List.map(item => go(item, env)))
       }
     }
     go(expr, list{})
+  }
+
+  let print = (expr: expr) => {
+    let rec go = (expr: expr) => {
+      switch expr {
+      | Cst(i) => Belt.Int.toString(i)
+      | Add(a, b) => "(" ++ go(a) ++ ") + (" ++ go(b) ++ ")"
+      | Mul(a, b) => "(" ++ go(a) ++ ") * (" ++ go(b) ++ ")"
+      | Var(i) => "var" ++ Belt.Int.toString(i)
+      | Let(e1, e2) => "let v0 = (" ++ go(e1) ++ ") in (" ++ go(e2) ++ ")"
+      | Fn(e) => "fn(" ++ go(e) ++ ")"
+      | App(e, args) =>
+        "app( " ++
+        go(e) ++
+        ", " ++
+        args
+        ->Belt.List.map(item => go(item))
+        ->Belt.List.reduce("", (list, item) => list ++ "(" ++ item ++ "), ") ++ " )"
+      }
+    }
+    go(expr)
   }
 }
 
@@ -415,16 +434,20 @@ let my_expr = Ast.Mul(
 let my_nameless = Nameless.compile(my_expr)
 Js.log("Nameless:")
 Js.log(Nameless.print(my_nameless))
+
 let my_indexed = Indexed.compile(my_nameless)
-let instrs = Vm.compile_indexed(my_indexed)
+Js.log("==> Indexed:")
+Js.log(Indexed.print(my_indexed))
 
-let instrs2 = Vm.compile_ast(my_expr)
+// let instrs = Vm.compile_indexed(my_indexed)
 
-Js.log("==> multi-level ir:")
-Vm.print(instrs)
+// let instrs2 = Vm.compile_ast(my_expr)
 
-Js.log("==> single pass:")
-Vm.print(instrs2)
+// Js.log("==> multi-level ir:")
+// Vm.print(instrs)
+
+// Js.log("==> single pass:")
+// Vm.print(instrs2)
 
 Js.log(Ast.eval(my_expr))
 // Js.log(Vm.eval(instrs, list{}))
