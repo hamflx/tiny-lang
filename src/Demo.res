@@ -8,6 +8,14 @@ let findIndex = (list: list<'a>, item: 'a) => {
   findWithIndex(list, 0)
 }
 
+let to_little_endian_32 = (i: int): list<int> => {
+  let b1 = i->land(0xff)
+  let b2 = i->lsr(8)->land(0xff)
+  let b3 = i->lsr(16)->land(0xff)
+  let b4 = i->lsr(24)->land(0xff)
+  list{b1, b2, b3, b4}
+}
+
 module Ast = {
   type rec expr =
     | Cst(int)
@@ -175,10 +183,34 @@ module Indexed = {
 }
 
 module Vm = {
-  type instr = Cst(int) | Add | Mul | Var(int) | Pop | Swap
+  type instr =
+    | Cst(int)
+    | Add
+    | Mul
+    | Var(int)
+    | Pop
+    | Swap
+    | Call(string, int)
+    | Ret(int)
+    | IfZero
+    | Goto(string)
+    | Exit
+    | Label(string)
   type instrs = list<instr>
   type operand = int
   type stack = list<operand>
+
+  let instr_const = 0
+  let instr_add = 1
+  let instr_mul = 2
+  let instr_var = 3
+  let instr_pop = 4
+  let instr_swap = 5
+  let instr_call = 6
+  let instr_ret = 7
+  let instr_goto = 8
+  let instr_if_zero = 9
+  let instr_exit = 10
 
   let rec eval = (instrs: instrs, stk: stack) => {
     switch (instrs, stk) {
@@ -222,6 +254,61 @@ module Vm = {
       }
     }
     compile_inner(expr, list{})
+  }
+
+  let get_instr_size = (instr: instr) => {
+    switch instr {
+    | Label(_) => 0
+    | Cst(_) | Var(_) | Ret(_) | Goto(_) => 2
+    | Add | Mul | Pop | Swap | IfZero | Exit => 1
+    | Call(_, _) => 3
+    }
+  }
+
+  let to_hex = (code: list<int>) => {
+    code->Belt.List.reduce("", (sum, item) =>
+      sum ++
+      item
+      ->to_little_endian_32
+      ->Belt.List.reduce("", (sum, item) =>
+        sum ++ ("00" ++ Js.Int.toStringWithRadix(item, ~radix=16))->Js.String2.sliceToEnd(~from=-2)
+      )
+    )
+  }
+
+  let to_bytecode = (instrs: instrs) => {
+    let (label_map, _) = instrs->Belt.List.reduce((list{}, 0), ((label_map, pos), item) => {
+      switch item {
+      | Label(label) => (list{(label, pos), ...label_map}, pos)
+      | _ => (label_map, pos + item->get_instr_size)
+      }
+    })
+    let compile_instr = (instr: instr, label_map: list<(string, int)>) => {
+      switch instr {
+      | Label(_) => list{}
+      | Cst(i) => list{instr_const, i}
+      | Add => list{instr_add}
+      | Mul => list{instr_mul}
+      | Var(i) => list{instr_var, i}
+      | Pop => list{instr_pop}
+      | Swap => list{instr_swap}
+      | Call(target, args) => list{instr_call, target->List.assoc(label_map), args}
+      | Ret(args) => list{instr_ret, args}
+      | IfZero => list{instr_if_zero}
+      | Goto(target) => list{instr_goto, target->List.assoc(label_map)}
+      | Exit => list{instr_exit}
+      }
+    }
+    let code = instrs->Belt.List.reduce(list{}, (code, instr) =>
+      list{
+        ...code,
+        ...switch instr {
+        | Label(_) => list{}
+        | instr => instr->compile_instr(label_map)
+        },
+      }
+    )
+    code
   }
 
   let rec compile_indexed = (expr: Indexed.expr): instrs => {
@@ -299,14 +386,6 @@ module Native = {
       }
     }
     optimize_rec(instrs)
-  }
-
-  let to_little_endian_32 = (i: int): list<int> => {
-    let b1 = i->land(0xff)
-    let b2 = i->lsr(8)->land(0xff)
-    let b3 = i->lsr(16)->land(0xff)
-    let b4 = i->lsr(24)->land(0xff)
-    list{b1, b2, b3, b4}
   }
 
   let generate = (instrs: instrs) => {
@@ -420,16 +499,18 @@ module Native = {
   }
 }
 
-let my_expr = Ast.Mul(
-  Ast.App(
-    Ast.Fn(list{"x"}, Ast.Let("y", Ast.Cst(1), Ast.Add(Ast.Var("x"), Ast.Var("y")))),
-    list{Ast.Cst(3)},
-  ),
-  Ast.Add(
-    Ast.Add(Ast.Cst(10086), Ast.Let("x", Ast.Cst(2), Ast.Add(Ast.Var("x"), Ast.Var("x")))),
-    Ast.Cst(3),
-  ),
-)
+// let my_expr = Ast.Mul(
+//   Ast.App(
+//     Ast.Fn(list{"x"}, Ast.Let("y", Ast.Cst(1), Ast.Add(Ast.Var("x"), Ast.Var("y")))),
+//     list{Ast.Cst(3)},
+//   ),
+//   Ast.Add(
+//     Ast.Add(Ast.Cst(10086), Ast.Let("x", Ast.Cst(2), Ast.Add(Ast.Var("x"), Ast.Var("x")))),
+//     Ast.Cst(3),
+//   ),
+// )
+
+let my_expr = Ast.Mul(Ast.Add(Ast.Cst(1), Ast.Cst(3)), Ast.Cst(3))
 
 let my_nameless = Nameless.compile(my_expr)
 Js.log("Nameless:")
@@ -439,26 +520,30 @@ let my_indexed = Indexed.compile(my_nameless)
 Js.log("==> Indexed:")
 Js.log(Indexed.print(my_indexed))
 
-// let instrs = Vm.compile_indexed(my_indexed)
+let instrs = Vm.compile_indexed(my_indexed)
+let instrs2 = Vm.compile_ast(my_expr)
 
-// let instrs2 = Vm.compile_ast(my_expr)
+Js.log("==> multi-level ir:")
+Vm.print(instrs)
 
-// Js.log("==> multi-level ir:")
-// Vm.print(instrs)
-
-// Js.log("==> single pass:")
-// Vm.print(instrs2)
+Js.log("==> single pass:")
+Vm.print(instrs2)
 
 Js.log(Ast.eval(my_expr))
-// Js.log(Vm.eval(instrs, list{}))
-// Js.log(Vm.eval(instrs2, list{}))
+Js.log(Vm.eval(instrs, list{}))
+Js.log(Vm.eval(instrs2, list{}))
 
-// let assembly = Native.optimize(Native.compile_vm(instrs2))
-// Js.log("==> native ir:")
-// Native.print(assembly)
+// bytecode
+let bytecode = Vm.to_hex(Vm.to_bytecode(list{...instrs2, Vm.Exit}))
+Node.Fs.writeFileSync("bytecode.bin", bytecode, #hex)
 
-// Js.log("==> machine code:")
-// let machine_code = Native.to_hex(Native.generate(assembly))
-// Js.log(machine_code)
+// machine code
+let assembly = Native.optimize(Native.compile_vm(instrs2))
+Js.log("==> native ir:")
+Native.print(assembly)
 
-// Node.Fs.writeFileSync("machine_code.bin", machine_code, #hex)
+Js.log("==> machine code:")
+let machine_code = Native.to_hex(Native.generate(assembly))
+Js.log(machine_code)
+
+Node.Fs.writeFileSync("machine_code.bin", machine_code, #hex)

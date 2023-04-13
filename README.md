@@ -3,7 +3,8 @@
 ```
 npm run res:build
 node src/Demo.bs.js
-cargo run
+cargo run -p shellcode
+cargo run -p vm
 ```
 
 ```

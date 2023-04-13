@@ -1,7 +1,7 @@
-const EXE_CODE_LEN: usize = include_bytes!("../machine_code.bin").len();
+const EXE_CODE_LEN: usize = include_bytes!("../../machine_code.bin").len();
 
 #[link_section = ".text"]
-static EXE_CODE: [u8; EXE_CODE_LEN] = *include_bytes!("../machine_code.bin");
+static EXE_CODE: [u8; EXE_CODE_LEN] = *include_bytes!("../../machine_code.bin");
 
 type ExeCodeFn = extern "system" fn() -> usize;
 

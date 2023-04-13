@@ -6,6 +6,7 @@
 
 /machine_code.bin
 /test.o
+/bytecode.bin
 
 # Added by cargo
 
