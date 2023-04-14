@@ -80,9 +80,23 @@ impl Vm {
                     self.sp -= 1;
                     self.pc += 1;
                 }
-                Instruction::Var => todo!(),
-                Instruction::Pop => todo!(),
-                Instruction::Swap => todo!(),
+                Instruction::Var => {
+                    let offset = self.code[self.pc as usize + 1];
+                    let var = self.stack[(self.sp - offset) as usize];
+                    self.stack[(self.sp + 1) as usize] = var;
+                    self.sp += 1;
+                    self.pc += 2;
+                }
+                Instruction::Pop => {
+                    self.sp -= 1;
+                    self.pc += 1;
+                }
+                Instruction::Swap => {
+                    let top = self.stack[self.sp as usize];
+                    self.stack[self.sp as usize] = self.stack[self.sp as usize - 1];
+                    self.stack[self.sp as usize - 1] = top;
+                    self.pc += 1;
+                }
                 Instruction::Call => todo!(),
                 Instruction::Ret => todo!(),
                 Instruction::Goto => todo!(),

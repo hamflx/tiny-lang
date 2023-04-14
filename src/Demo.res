@@ -510,7 +510,18 @@ module Native = {
 //   ),
 // )
 
-let my_expr = Ast.Mul(Ast.Add(Ast.Cst(1), Ast.Cst(3)), Ast.Cst(3))
+// 20
+let my_expr = Ast.Mul(
+  Ast.Add(Ast.Cst(1), Ast.Cst(3)), // 4
+  Ast.Let(
+    "x", // x=3
+    Ast.Add(Ast.Cst(1), Ast.Cst(2)), // 3
+    Ast.Add(
+      Ast.Var("x"), // 3
+      Ast.Let("y", Ast.Add(Ast.Cst(1), Ast.Cst(1)), Ast.Add(Ast.Var("x"), Ast.Var("y"))), // y=2 5
+    ),
+  ),
+)
 
 let my_nameless = Nameless.compile(my_expr)
 Js.log("Nameless:")
