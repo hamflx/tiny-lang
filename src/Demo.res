@@ -344,26 +344,27 @@ module Native = {
   type instrs = list<instr>
 
   let compile_vm = (instrs: Vm.instrs): instrs => {
-    let rec compile_inner = (instrs: Vm.instrs): instrs => {
-      switch instrs {
-      | list{} => list{}
-      | list{Vm.Cst(i), ...tail} => list{Mov(Rax, Constant(i)), Push(Rax), ...compile_inner(tail)}
-      | list{Vm.Add, ...tail} =>
-        list{Pop(Rax), Pop(Rbx), Add(Rax, Rbx), Push(Rax), ...compile_inner(tail)}
-      | list{Vm.Mul, ...tail} =>
-        list{Pop(Rax), Pop(Rbx), Mul(Rbx), Push(Rax), ...compile_inner(tail)}
-      | list{Vm.Var(i), ...tail} =>
+    let compile_instr = (instr: Vm.instr) => {
+      switch instr {
+      | Vm.Cst(i) => list{Mov(Rax, Constant(i)), Push(Rax)}
+      | Vm.Add => list{Pop(Rax), Pop(Rbx), Add(Rax, Rbx), Push(Rax)}
+      | Vm.Mul => list{Pop(Rax), Pop(Rbx), Mul(Rbx), Push(Rax)}
+      | Vm.Var(i) =>
         list{
           Mov(Rbx, Constant(i)),
           Mov(Rax, RegOffset({base: Rsp, index: Rbx, scale: 8, disp: 0})),
           Push(Rax),
-          ...compile_inner(tail),
         }
+      | Vm.Pop => list{Pop(Rax)}
+      | Vm.Swap => list{Pop(Rax), Pop(Rbx), Push(Rax), Push(Rbx)}
+      }
+    }
+    let rec compile_inner = (instrs: Vm.instrs): instrs => {
+      switch instrs {
+      | list{} => list{}
       | list{Vm.Swap, Vm.Pop, ...tail} =>
         list{Pop(Rax), Pop(Rbx), Push(Rax), ...compile_inner(tail)}
-      | list{Vm.Pop, ...tail} => list{Pop(Rax), ...compile_inner(tail)}
-      | list{Vm.Swap, ...tail} =>
-        list{Pop(Rax), Pop(Rbx), Push(Rax), Push(Rbx), ...compile_inner(tail)}
+      | list{head, ...tail} => list{...compile_instr(head), ...compile_inner(tail)}
       }
     }
     list{...compile_inner(instrs), Pop(Rax), Ret}

@@ -894,13 +894,9 @@ var Vm = {
 };
 
 function compile_vm(instrs) {
-  var compile_inner = function (instrs) {
-    if (!instrs) {
-      return /* [] */0;
-    }
-    var i = instrs.hd;
-    if (typeof i === "number") {
-      switch (i) {
+  var compile_instr = function (instr) {
+    if (typeof instr === "number") {
+      switch (instr) {
         case /* Add */0 :
             return {
                     hd: {
@@ -923,7 +919,7 @@ function compile_vm(instrs) {
                             TAG: /* Push */1,
                             _0: /* Rax */0
                           },
-                          tl: compile_inner(instrs.tl)
+                          tl: /* [] */0
                         }
                       }
                     }
@@ -949,7 +945,7 @@ function compile_vm(instrs) {
                             TAG: /* Push */1,
                             _0: /* Rax */0
                           },
-                          tl: compile_inner(instrs.tl)
+                          tl: /* [] */0
                         }
                       }
                     }
@@ -960,31 +956,9 @@ function compile_vm(instrs) {
                       TAG: /* Pop */2,
                       _0: /* Rax */0
                     },
-                    tl: compile_inner(instrs.tl)
+                    tl: /* [] */0
                   };
         case /* Swap */3 :
-            var tail = instrs.tl;
-            if (tail && tail.hd === 2) {
-              return {
-                      hd: {
-                        TAG: /* Pop */2,
-                        _0: /* Rax */0
-                      },
-                      tl: {
-                        hd: {
-                          TAG: /* Pop */2,
-                          _0: /* Rbx */1
-                        },
-                        tl: {
-                          hd: {
-                            TAG: /* Push */1,
-                            _0: /* Rax */0
-                          },
-                          tl: compile_inner(tail.tl)
-                        }
-                      }
-                    };
-            }
             return {
                     hd: {
                       TAG: /* Pop */2,
@@ -1005,7 +979,7 @@ function compile_vm(instrs) {
                             TAG: /* Push */1,
                             _0: /* Rbx */1
                           },
-                          tl: compile_inner(tail)
+                          tl: /* [] */0
                         }
                       }
                     }
@@ -1022,7 +996,7 @@ function compile_vm(instrs) {
               };
       }
     } else {
-      switch (i.TAG | 0) {
+      switch (instr.TAG | 0) {
         case /* Cst */0 :
             return {
                     hd: {
@@ -1030,7 +1004,7 @@ function compile_vm(instrs) {
                       _0: /* Rax */0,
                       _1: {
                         TAG: /* Constant */0,
-                        _0: i._0
+                        _0: instr._0
                       }
                     },
                     tl: {
@@ -1038,7 +1012,7 @@ function compile_vm(instrs) {
                         TAG: /* Push */1,
                         _0: /* Rax */0
                       },
-                      tl: compile_inner(instrs.tl)
+                      tl: /* [] */0
                     }
                   };
         case /* Var */1 :
@@ -1048,7 +1022,7 @@ function compile_vm(instrs) {
                       _0: /* Rbx */1,
                       _1: {
                         TAG: /* Constant */0,
-                        _0: i._0
+                        _0: instr._0
                       }
                     },
                     tl: {
@@ -1068,7 +1042,7 @@ function compile_vm(instrs) {
                           TAG: /* Push */1,
                           _0: /* Rax */0
                         },
-                        tl: compile_inner(instrs.tl)
+                        tl: /* [] */0
                       }
                     }
                   };
@@ -1084,6 +1058,41 @@ function compile_vm(instrs) {
               };
       }
     }
+  };
+  var compile_inner = function (instrs) {
+    if (!instrs) {
+      return /* [] */0;
+    }
+    var head = instrs.hd;
+    if (head === 3) {
+      var match = instrs.tl;
+      if (match && match.hd === 2) {
+        return {
+                hd: {
+                  TAG: /* Pop */2,
+                  _0: /* Rax */0
+                },
+                tl: {
+                  hd: {
+                    TAG: /* Pop */2,
+                    _0: /* Rbx */1
+                  },
+                  tl: {
+                    hd: {
+                      TAG: /* Push */1,
+                      _0: /* Rax */0
+                    },
+                    tl: compile_inner(match.tl)
+                  }
+                }
+              };
+      }
+      
+    }
+    return Belt_List.concatMany([
+                compile_instr(head),
+                compile_inner(instrs.tl)
+              ]);
   };
   return Belt_List.concatMany([
               compile_inner(instrs),
@@ -1173,7 +1182,7 @@ function generate(instrs) {
                               RE_EXN_ID: "Assert_failure",
                               _1: [
                                 "Demo.res",
-                                403,
+                                404,
                                 17
                               ],
                               Error: new Error()
@@ -1219,7 +1228,7 @@ function generate(instrs) {
                                   RE_EXN_ID: "Assert_failure",
                                   _1: [
                                     "Demo.res",
-                                    418,
+                                    419,
                                     19
                                   ],
                                   Error: new Error()
@@ -1245,7 +1254,7 @@ function generate(instrs) {
                                   RE_EXN_ID: "Assert_failure",
                                   _1: [
                                     "Demo.res",
-                                    425,
+                                    426,
                                     19
                                   ],
                                   Error: new Error()
@@ -1273,7 +1282,7 @@ function generate(instrs) {
                           RE_EXN_ID: "Assert_failure",
                           _1: [
                             "Demo.res",
-                            429,
+                            430,
                             15
                           ],
                           Error: new Error()
@@ -1373,7 +1382,7 @@ function generate(instrs) {
           RE_EXN_ID: "Assert_failure",
           _1: [
             "Demo.res",
-            442,
+            443,
             13
           ],
           Error: new Error()
