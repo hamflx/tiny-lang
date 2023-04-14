@@ -24,7 +24,7 @@ module Ast = {
     | Var(string)
     | Let(string, expr, expr)
     | Fn(list<string>, expr)
-    | App(expr, list<expr>)
+    | App(string, list<expr>)
 
   type rec value =
     | Vint(int)
@@ -45,31 +45,31 @@ module Ast = {
     }
   }
 
-  let eval = (expr: expr) => {
-    let rec eval_inner = (expr: expr, env: env) => {
-      switch expr {
-      | Cst(i) => Vint(i)
-      | Var(name) => List.assoc(name, env)
-      | Add(a, b) => vadd(eval_inner(a, env), eval_inner(b, env))
-      | Mul(a, b) => vmul(eval_inner(a, env), eval_inner(b, env))
-      | Let(name, a, b) => eval_inner(b, list{(name, eval_inner(a, env)), ...env})
-      | Fn(params, body) => Vclosure(env, params, body)
-      | App(fn, args) => {
-          let (env_closure, params, body) = switch eval_inner(fn, env) {
-          | Vint(_) => assert false
-          | Vclosure(env_closure, params, body) => (env_closure, params, body)
-          }
-          let arg_env = Belt.List.zip(params, args->Belt.List.map(arg => eval_inner(arg, env)))
-          let fn_env = list{...arg_env, ...env_closure}
-          eval_inner(body, fn_env)
-        }
-      }
-    }
-    switch eval_inner(expr, list{}) {
-    | Vint(i) => i
-    | _ => assert false
-    }
-  }
+  // let eval = (expr: expr) => {
+  //   let rec eval_inner = (expr: expr, env: env) => {
+  //     switch expr {
+  //     | Cst(i) => Vint(i)
+  //     | Var(name) => List.assoc(name, env)
+  //     | Add(a, b) => vadd(eval_inner(a, env), eval_inner(b, env))
+  //     | Mul(a, b) => vmul(eval_inner(a, env), eval_inner(b, env))
+  //     | Let(name, a, b) => eval_inner(b, list{(name, eval_inner(a, env)), ...env})
+  //     | Fn(params, body) => Vclosure(env, params, body)
+  //     | App(fn, args) => {
+  //         let (env_closure, params, body) = switch eval_inner(fn, env) {
+  //         | Vint(_) => assert false
+  //         | Vclosure(env_closure, params, body) => (env_closure, params, body)
+  //         }
+  //         let arg_env = Belt.List.zip(params, args->Belt.List.map(arg => eval_inner(arg, env)))
+  //         let fn_env = list{...arg_env, ...env_closure}
+  //         eval_inner(body, fn_env)
+  //       }
+  //     }
+  //   }
+  //   switch eval_inner(expr, list{}) {
+  //   | Vint(i) => i
+  //   | _ => assert false
+  //   }
+  // }
 }
 
 module Nameless = {
@@ -82,22 +82,22 @@ module Nameless = {
     | Fn(int, expr)
     | App(expr, list<expr>)
 
-  let compile = (expr: Ast.expr): expr => {
-    let rec compile_inner = (expr: Ast.expr, env: list<string>): expr => {
-      switch expr {
-      | Ast.Cst(i) => Cst(i)
-      | Ast.Add(a, b) => Add(compile_inner(a, env), compile_inner(b, env))
-      | Ast.Mul(a, b) => Mul(compile_inner(a, env), compile_inner(b, env))
-      | Ast.Var(name) => Var(findIndex(env, name))
-      | Ast.Let(name, e1, e2) => Let(compile_inner(e1, env), compile_inner(e2, list{name, ...env}))
-      | Ast.Fn(params, body) =>
-        Fn(Belt.List.length(params), compile_inner(body, list{...params, ...env}))
-      | Ast.App(fn, args) =>
-        App(compile_inner(fn, env), args->Belt.List.map(item => compile_inner(item, env)))
-      }
-    }
-    compile_inner(expr, list{})
-  }
+  // let compile = (expr: Ast.expr): expr => {
+  //   let rec compile_inner = (expr: Ast.expr, env: list<string>): expr => {
+  //     switch expr {
+  //     | Ast.Cst(i) => Cst(i)
+  //     | Ast.Add(a, b) => Add(compile_inner(a, env), compile_inner(b, env))
+  //     | Ast.Mul(a, b) => Mul(compile_inner(a, env), compile_inner(b, env))
+  //     | Ast.Var(name) => Var(findIndex(env, name))
+  //     | Ast.Let(name, e1, e2) => Let(compile_inner(e1, env), compile_inner(e2, list{name, ...env}))
+  //     | Ast.Fn(params, body) =>
+  //       Fn(Belt.List.length(params), compile_inner(body, list{...params, ...env}))
+  //     | Ast.App(fn, args) =>
+  //       App(compile_inner(fn, env), args->Belt.List.map(item => compile_inner(item, env)))
+  //     }
+  //   }
+  //   compile_inner(expr, list{})
+  // }
 
   let print = (expr: expr) => {
     let rec go = (expr: expr) => {
@@ -212,21 +212,16 @@ module Vm = {
   let instr_if_zero = 9
   let instr_exit = 10
 
-  let rec eval = (instrs: instrs, stk: stack) => {
-    switch (instrs, stk) {
-    | (list{}, list{operand}) => operand
-    | (list{Cst(i), ...rest}, _) => eval(rest, list{i, ...stk})
-    | (list{Var(i), ...rest}, _) => eval(rest, list{List.nth(stk, i), ...stk})
-    | (list{Add, ...rest}, list{a, b, ...stk}) => eval(rest, list{a + b, ...stk})
-    | (list{Mul, ...rest}, list{a, b, ...stk}) => eval(rest, list{a * b, ...stk})
-    | (list{Pop, ...rest}, list{_, ...stk}) => eval(rest, stk)
-    | (list{Swap, ...rest}, list{a, b, ...stk}) => eval(rest, list{b, a, ...stk})
-    | _ => assert false
-    }
-  }
-
   type sv = Slocal(string) | Stmp
   type senv = list<sv>
+
+  type rec expr =
+    | Cst(int)
+    | Add(expr, expr)
+    | Mul(expr, expr)
+    | Var(string)
+    | Let(string, expr, expr)
+    | App(string, list<expr>)
 
   let find_local_index = (env: senv, name: string) => {
     let rec find_recursive = (env: senv, stack_index: int) => {
@@ -239,21 +234,79 @@ module Vm = {
     find_recursive(env, 0)
   }
 
-  let compile_ast = (expr: Ast.expr): instrs => {
-    let rec compile_inner = (expr: Ast.expr, env: senv): instrs => {
+  type fun = (string, list<string>, expr)
+  type prog = list<fun>
+
+  let preprocess = (expr: Ast.expr): list<fun> => {
+    let rec preprocess_rec = (expr: Ast.expr): (expr, list<fun>) => {
       switch expr {
-      | Ast.Cst(i) => list{Cst(i)}
-      | Ast.Add(e1, e2) =>
-        list{...compile_inner(e1, env), ...compile_inner(e2, list{Stmp, ...env}), Add}
-      | Ast.Mul(e1, e2) =>
-        list{...compile_inner(e1, env), ...compile_inner(e2, list{Stmp, ...env}), Mul}
-      | Ast.Var(name) => list{Var(find_local_index(env, name))}
-      | Ast.Let(name, e1, e2) =>
-        list{...compile_inner(e1, env), ...compile_inner(e2, list{Slocal(name), ...env}), Swap, Pop}
-      | _ => assert false
+      | Cst(i) => (Cst(i), list{})
+      | Var(binding) => (Var(binding), list{})
+      | Add(a, b) => {
+          let (a_expr, a_fns) = preprocess_rec(a)
+          let (b_expr, b_fns) = preprocess_rec(b)
+          (Add(a_expr, b_expr), list{...a_fns, ...b_fns})
+        }
+      | Mul(a, b) => {
+          let (a_expr, a_fns) = preprocess_rec(a)
+          let (b_expr, b_fns) = preprocess_rec(b)
+          (Mul(a_expr, b_expr), list{...a_fns, ...b_fns})
+        }
+      | Let(binding, Fn(params, body), expr) => {
+          let (main, outer_fns) = preprocess_rec(expr)
+          let (fn_body, inner_fns) = preprocess_rec(body)
+          (main, list{(binding, params, fn_body), ...inner_fns, ...outer_fns})
+        }
+      | Let(binding, v1, v2) => {
+          let (v1, fns1) = preprocess_rec(v1)
+          let (v2, fns2) = preprocess_rec(v2)
+          (Let(binding, v1, v2), list{...fns1, ...fns2})
+        }
+      | App(name, args) => {
+          let (args, fns) = args->Belt.List.reduce((list{}, list{}), ((args, fns), arg) => {
+            let (expr, inner_fns) = preprocess_rec(arg)
+            (list{expr, ...args}, list{...inner_fns, ...fns})
+          })
+          (App(name, args), fns)
+        }
+      | Fn(_, _) => assert false
       }
     }
-    compile_inner(expr, list{})
+    let (main, fns) = preprocess_rec(expr)
+    list{("main", list{}, main), ...fns}
+  }
+
+  let compile_expr = (expr: expr, env: senv): instrs => {
+    let rec compile_inner = (expr: expr, env: senv): instrs => {
+      switch expr {
+      | Cst(i) => list{Cst(i)}
+      | Add(e1, e2) =>
+        list{...compile_inner(e1, env), ...compile_inner(e2, list{Stmp, ...env}), Add}
+      | Mul(e1, e2) =>
+        list{...compile_inner(e1, env), ...compile_inner(e2, list{Stmp, ...env}), Mul}
+      | Var(name) => list{Var(find_local_index(env, name))}
+      | Let(name, e1, e2) =>
+        list{...compile_inner(e1, env), ...compile_inner(e2, list{Slocal(name), ...env}), Swap, Pop}
+      | App(name, args) => {
+          let (args_instrs, _) = args->Belt.List.reduce((list{}, env), ((args, env), arg) => {
+            (list{...args, ...compile_inner(arg, env)}, list{Stmp, ...env})
+          })
+          list{...args_instrs, Call(name, args->Belt.List.length)}
+        }
+      }
+    }
+    compile_inner(expr, env)
+  }
+
+  let compile_fun = (fun: fun): instrs => {
+    let (name, params, body) = fun
+    let stack = params->Belt.List.map(name => Slocal(name))
+    list{Label(name), ...compile_expr(body, list{Stmp, ...stack}), Ret(params->Belt.List.length)}
+  }
+
+  let compile_prog = (expr: Ast.expr): instrs => {
+    let fns = preprocess(expr)->Belt.List.map(fn => compile_fun(fn))->Belt.List.flatten
+    list{Call("main", 0), Exit, ...fns}
   }
 
   let get_instr_size = (instr: instr) => {
@@ -330,6 +383,12 @@ module Vm = {
       | Var(i) => "var " ++ Belt.Int.toString(i)
       | Pop => "pop"
       | Swap => "swap"
+      | IfZero => "if_zero"
+      | Exit => "exit"
+      | Call(name, args) => "call/" ++ args->Belt.Int.toString ++ " " ++ name
+      | Ret(n) => "ret " ++ n->Belt.Int.toString
+      | Goto(label) => "goto " ++ label
+      | Label(label) => label ++ ":"
       }
       Js.log(instr_text)
     }
@@ -512,50 +571,55 @@ module Native = {
 // )
 
 // 20
-let my_expr = Ast.Mul(
-  Ast.Add(Ast.Cst(1), Ast.Cst(3)), // 4
-  Ast.Let(
-    "x", // x=3
-    Ast.Add(Ast.Cst(1), Ast.Cst(2)), // 3
-    Ast.Add(
-      Ast.Var("x"), // 3
-      Ast.Let("y", Ast.Add(Ast.Cst(1), Ast.Cst(1)), Ast.Add(Ast.Var("x"), Ast.Var("y"))), // y=2 5
-    ),
-  ),
+// let my_expr = Ast.Mul(
+//   Ast.Add(Ast.Cst(1), Ast.Cst(3)), // 4
+//   Ast.Let(
+//     "x", // x=3
+//     Ast.Add(Ast.Cst(1), Ast.Cst(2)), // 3
+//     Ast.Add(
+//       Ast.Var("x"), // 3
+//       Ast.Let("y", Ast.Add(Ast.Cst(1), Ast.Cst(1)), Ast.Add(Ast.Var("x"), Ast.Var("y"))), // y=2 5
+//     ),
+//   ),
+// )
+
+let my_expr = Ast.Let(
+  "add",
+  Ast.Fn(list{"a", "b"}, Ast.Add(Var("a"), Var("b"))),
+  Ast.App("add", list{Ast.Cst(1), Ast.Cst(2)}),
 )
 
-let my_nameless = Nameless.compile(my_expr)
-Js.log("Nameless:")
-Js.log(Nameless.print(my_nameless))
+// let my_nameless = Nameless.compile(my_expr)
+// Js.log("Nameless:")
+// Js.log(Nameless.print(my_nameless))
 
-let my_indexed = Indexed.compile(my_nameless)
-Js.log("==> Indexed:")
-Js.log(Indexed.print(my_indexed))
+// let my_indexed = Indexed.compile(my_nameless)
+// Js.log("==> Indexed:")
+// Js.log(Indexed.print(my_indexed))
 
-let instrs = Vm.compile_indexed(my_indexed)
-let instrs2 = Vm.compile_ast(my_expr)
+// let instrs = Vm.compile_indexed(my_indexed)
+// Js.log("==> multi-level ir:")
+// Vm.print(instrs)
 
-Js.log("==> multi-level ir:")
-Vm.print(instrs)
+let instrs2 = Vm.compile_prog(my_expr)
 
 Js.log("==> single pass:")
 Vm.print(instrs2)
 
-Js.log(Ast.eval(my_expr))
-Js.log(Vm.eval(instrs, list{}))
-Js.log(Vm.eval(instrs2, list{}))
+// Js.log(Ast.eval(my_expr))
+// Js.log(Vm.eval(instrs, list{}))
 
 // bytecode
 let bytecode = Vm.to_hex(Vm.to_bytecode(list{...instrs2, Vm.Exit}))
 Node.Fs.writeFileSync("bytecode.bin", bytecode, #hex)
 
 // machine code
-let assembly = Native.optimize(Native.compile_vm(instrs2))
-Js.log("==> native ir:")
-Native.print(assembly)
+// let assembly = Native.optimize(Native.compile_vm(instrs2))
+// Js.log("==> native ir:")
+// Native.print(assembly)
 
-Js.log("==> machine code:")
-let machine_code = Native.to_hex(Native.generate(assembly))
-Js.log(machine_code)
+// Js.log("==> machine code:")
+// let machine_code = Native.to_hex(Native.generate(assembly))
+// Js.log(machine_code)
 
-Node.Fs.writeFileSync("machine_code.bin", machine_code, #hex)
+// Node.Fs.writeFileSync("machine_code.bin", machine_code, #hex)

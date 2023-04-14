@@ -103,153 +103,10 @@ function vmul(a, b) {
       };
 }
 
-function $$eval(expr) {
-  var eval_inner = function (_expr, _env) {
-    while(true) {
-      var env = _env;
-      var expr = _expr;
-      switch (expr.TAG | 0) {
-        case /* Cst */0 :
-            return {
-                    TAG: /* Vint */0,
-                    _0: expr._0
-                  };
-        case /* Add */1 :
-            return vadd(eval_inner(expr._0, env), eval_inner(expr._1, env));
-        case /* Mul */2 :
-            return vmul(eval_inner(expr._0, env), eval_inner(expr._1, env));
-        case /* Var */3 :
-            return List.assoc(expr._0, env);
-        case /* Let */4 :
-            _env = {
-              hd: [
-                expr._0,
-                eval_inner(expr._1, env)
-              ],
-              tl: env
-            };
-            _expr = expr._2;
-            continue ;
-        case /* Fn */5 :
-            return {
-                    TAG: /* Vclosure */1,
-                    _0: env,
-                    _1: expr._0,
-                    _2: expr._1
-                  };
-        case /* App */6 :
-            var match = eval_inner(expr._0, env);
-            var match$1;
-            if (match.TAG === /* Vint */0) {
-              throw {
-                    RE_EXN_ID: "Assert_failure",
-                    _1: [
-                      "Demo.res",
-                      59,
-                      23
-                    ],
-                    Error: new Error()
-                  };
-            }
-            match$1 = [
-              match._0,
-              match._1,
-              match._2
-            ];
-            var arg_env = Belt_List.zip(match$1[1], Belt_List.map(expr._1, (function(env){
-                    return function (arg) {
-                      return eval_inner(arg, env);
-                    }
-                    }(env))));
-            var fn_env = Belt_List.concatMany([
-                  arg_env,
-                  match$1[0]
-                ]);
-            _env = fn_env;
-            _expr = match$1[2];
-            continue ;
-        
-      }
-    };
-  };
-  var i = eval_inner(expr, /* [] */0);
-  if (i.TAG === /* Vint */0) {
-    return i._0;
-  }
-  throw {
-        RE_EXN_ID: "Assert_failure",
-        _1: [
-          "Demo.res",
-          70,
-          11
-        ],
-        Error: new Error()
-      };
-}
-
 var Ast = {
   vadd: vadd,
-  vmul: vmul,
-  $$eval: $$eval
+  vmul: vmul
 };
-
-function compile(expr) {
-  var compile_inner = function (expr, env) {
-    switch (expr.TAG | 0) {
-      case /* Cst */0 :
-          return {
-                  TAG: /* Cst */0,
-                  _0: expr._0
-                };
-      case /* Add */1 :
-          return {
-                  TAG: /* Add */1,
-                  _0: compile_inner(expr._0, env),
-                  _1: compile_inner(expr._1, env)
-                };
-      case /* Mul */2 :
-          return {
-                  TAG: /* Mul */2,
-                  _0: compile_inner(expr._0, env),
-                  _1: compile_inner(expr._1, env)
-                };
-      case /* Var */3 :
-          return {
-                  TAG: /* Var */3,
-                  _0: findIndex(env, expr._0)
-                };
-      case /* Let */4 :
-          return {
-                  TAG: /* Let */4,
-                  _0: compile_inner(expr._1, env),
-                  _1: compile_inner(expr._2, {
-                        hd: expr._0,
-                        tl: env
-                      })
-                };
-      case /* Fn */5 :
-          var params = expr._0;
-          return {
-                  TAG: /* Fn */5,
-                  _0: Belt_List.length(params),
-                  _1: compile_inner(expr._1, Belt_List.concatMany([
-                            params,
-                            env
-                          ]))
-                };
-      case /* App */6 :
-          return {
-                  TAG: /* App */6,
-                  _0: compile_inner(expr._0, env),
-                  _1: Belt_List.map(expr._1, (function (item) {
-                          return compile_inner(item, env);
-                        }))
-                };
-      
-    }
-  };
-  return compile_inner(expr, /* [] */0);
-}
 
 function print(expr) {
   var go = function (expr) {
@@ -277,7 +134,6 @@ function print(expr) {
 }
 
 var Nameless = {
-  compile: compile,
   print: print
 };
 
@@ -310,7 +166,7 @@ function find_local_index(env, local_index) {
   };
 }
 
-function compile$1(expr) {
+function compile(expr) {
   var go = function (expr, env) {
     switch (expr.TAG | 0) {
       case /* Cst */0 :
@@ -401,107 +257,9 @@ function print$1(expr) {
 
 var Indexed = {
   find_local_index: find_local_index,
-  compile: compile$1,
+  compile: compile,
   print: print$1
 };
-
-function $$eval$1(_instrs, _stk) {
-  while(true) {
-    var stk = _stk;
-    var instrs = _instrs;
-    if (instrs) {
-      var i = instrs.hd;
-      if (typeof i === "number") {
-        switch (i) {
-          case /* Add */0 :
-              if (stk) {
-                var match = stk.tl;
-                if (match) {
-                  _stk = {
-                    hd: stk.hd + match.hd | 0,
-                    tl: match.tl
-                  };
-                  _instrs = instrs.tl;
-                  continue ;
-                }
-                
-              }
-              break;
-          case /* Mul */1 :
-              if (stk) {
-                var match$1 = stk.tl;
-                if (match$1) {
-                  _stk = {
-                    hd: Math.imul(stk.hd, match$1.hd),
-                    tl: match$1.tl
-                  };
-                  _instrs = instrs.tl;
-                  continue ;
-                }
-                
-              }
-              break;
-          case /* Pop */2 :
-              if (stk) {
-                _stk = stk.tl;
-                _instrs = instrs.tl;
-                continue ;
-              }
-              break;
-          case /* Swap */3 :
-              if (stk) {
-                var match$2 = stk.tl;
-                if (match$2) {
-                  _stk = {
-                    hd: match$2.hd,
-                    tl: {
-                      hd: stk.hd,
-                      tl: match$2.tl
-                    }
-                  };
-                  _instrs = instrs.tl;
-                  continue ;
-                }
-                
-              }
-              break;
-          default:
-            
-        }
-      } else {
-        switch (i.TAG | 0) {
-          case /* Cst */0 :
-              _stk = {
-                hd: i._0,
-                tl: stk
-              };
-              _instrs = instrs.tl;
-              continue ;
-          case /* Var */1 :
-              _stk = {
-                hd: List.nth(stk, i._0),
-                tl: stk
-              };
-              _instrs = instrs.tl;
-              continue ;
-          default:
-            
-        }
-      }
-    } else if (stk && !stk.tl) {
-      return stk.hd;
-    }
-    throw {
-          RE_EXN_ID: "Assert_failure",
-          _1: [
-            "Demo.res",
-            224,
-            11
-          ],
-          Error: new Error()
-        };
-  };
-}
 
 function find_local_index$1(env, name) {
   var _env = env;
@@ -530,7 +288,138 @@ function find_local_index$1(env, name) {
   };
 }
 
-function compile_ast(expr) {
+function preprocess(expr) {
+  var preprocess_rec = function (expr) {
+    switch (expr.TAG | 0) {
+      case /* Cst */0 :
+          return [
+                  {
+                    TAG: /* Cst */0,
+                    _0: expr._0
+                  },
+                  /* [] */0
+                ];
+      case /* Add */1 :
+          var match = preprocess_rec(expr._0);
+          var match$1 = preprocess_rec(expr._1);
+          return [
+                  {
+                    TAG: /* Add */1,
+                    _0: match[0],
+                    _1: match$1[0]
+                  },
+                  Belt_List.concatMany([
+                        match[1],
+                        match$1[1]
+                      ])
+                ];
+      case /* Mul */2 :
+          var match$2 = preprocess_rec(expr._0);
+          var match$3 = preprocess_rec(expr._1);
+          return [
+                  {
+                    TAG: /* Mul */2,
+                    _0: match$2[0],
+                    _1: match$3[0]
+                  },
+                  Belt_List.concatMany([
+                        match$2[1],
+                        match$3[1]
+                      ])
+                ];
+      case /* Var */3 :
+          return [
+                  {
+                    TAG: /* Var */3,
+                    _0: expr._0
+                  },
+                  /* [] */0
+                ];
+      case /* Let */4 :
+          var v1 = expr._1;
+          var binding = expr._0;
+          if (v1.TAG === /* Fn */5) {
+            var match$4 = preprocess_rec(expr._2);
+            var match$5 = preprocess_rec(v1._1);
+            return [
+                    match$4[0],
+                    Belt_List.concatMany([
+                          {
+                            hd: [
+                              binding,
+                              v1._0,
+                              match$5[0]
+                            ],
+                            tl: match$5[1]
+                          },
+                          match$4[1]
+                        ])
+                  ];
+          }
+          var match$6 = preprocess_rec(v1);
+          var match$7 = preprocess_rec(expr._2);
+          return [
+                  {
+                    TAG: /* Let */4,
+                    _0: binding,
+                    _1: match$6[0],
+                    _2: match$7[0]
+                  },
+                  Belt_List.concatMany([
+                        match$6[1],
+                        match$7[1]
+                      ])
+                ];
+      case /* Fn */5 :
+          throw {
+                RE_EXN_ID: "Assert_failure",
+                _1: [
+                  "Demo.res",
+                  272,
+                  20
+                ],
+                Error: new Error()
+              };
+      case /* App */6 :
+          var match$8 = Belt_List.reduce(expr._1, [
+                /* [] */0,
+                /* [] */0
+              ], (function (param, arg) {
+                  var match = preprocess_rec(arg);
+                  return [
+                          {
+                            hd: match[0],
+                            tl: param[0]
+                          },
+                          Belt_List.concatMany([
+                                match[1],
+                                param[1]
+                              ])
+                        ];
+                }));
+          return [
+                  {
+                    TAG: /* App */5,
+                    _0: expr._0,
+                    _1: match$8[0]
+                  },
+                  match$8[1]
+                ];
+      
+    }
+  };
+  var match = preprocess_rec(expr);
+  return {
+          hd: [
+            "main",
+            /* [] */0,
+            match[0]
+          ],
+          tl: match[1]
+        };
+}
+
+function compile_expr(expr, env) {
   var compile_inner = function (expr, env) {
     switch (expr.TAG | 0) {
       case /* Cst */0 :
@@ -590,21 +479,82 @@ function compile_ast(expr) {
                         }
                       }
                     ]);
-      case /* Fn */5 :
-      case /* App */6 :
-          throw {
-                RE_EXN_ID: "Assert_failure",
-                _1: [
-                  "Demo.res",
-                  253,
-                  13
-                ],
-                Error: new Error()
-              };
+      case /* App */5 :
+          var args = expr._1;
+          var match = Belt_List.reduce(args, [
+                /* [] */0,
+                env
+              ], (function (param, arg) {
+                  var env = param[1];
+                  return [
+                          Belt_List.concatMany([
+                                param[0],
+                                compile_inner(arg, env)
+                              ]),
+                          {
+                            hd: /* Stmp */0,
+                            tl: env
+                          }
+                        ];
+                }));
+          return Belt_List.concatMany([
+                      match[0],
+                      {
+                        hd: {
+                          TAG: /* Call */2,
+                          _0: expr._0,
+                          _1: Belt_List.length(args)
+                        },
+                        tl: /* [] */0
+                      }
+                    ]);
       
     }
   };
-  return compile_inner(expr, /* [] */0);
+  return compile_inner(expr, env);
+}
+
+function compile_fun(fun) {
+  var params = fun[1];
+  var stack = Belt_List.map(params, (function (name) {
+          return /* Slocal */{
+                  _0: name
+                };
+        }));
+  return Belt_List.concatMany([
+              {
+                hd: {
+                  TAG: /* Label */5,
+                  _0: fun[0]
+                },
+                tl: compile_expr(fun[2], {
+                      hd: /* Stmp */0,
+                      tl: stack
+                    })
+              },
+              {
+                hd: {
+                  TAG: /* Ret */3,
+                  _0: Belt_List.length(params)
+                },
+                tl: /* [] */0
+              }
+            ]);
+}
+
+function compile_prog(expr) {
+  var fns = Belt_List.flatten(Belt_List.map(preprocess(expr), compile_fun));
+  return {
+          hd: {
+            TAG: /* Call */2,
+            _0: "main",
+            _1: 0
+          },
+          tl: {
+            hd: /* Exit */5,
+            tl: fns
+          }
+        };
 }
 
 function get_instr_size(instr) {
@@ -809,7 +759,7 @@ function compile_indexed(expr) {
               RE_EXN_ID: "Match_failure",
               _1: [
                 "Demo.res",
-                315,
+                368,
                 4
               ],
               Error: new Error()
@@ -836,16 +786,13 @@ function print$2(instrs) {
         case /* Swap */3 :
             instr_text = "swap";
             break;
-        default:
-          throw {
-                RE_EXN_ID: "Match_failure",
-                _1: [
-                  "Demo.res",
-                  326,
-                  23
-                ],
-                Error: new Error()
-              };
+        case /* IfZero */4 :
+            instr_text = "if_zero";
+            break;
+        case /* Exit */5 :
+            instr_text = "exit";
+            break;
+        
       }
     } else {
       switch (i$1.TAG | 0) {
@@ -855,16 +802,19 @@ function print$2(instrs) {
         case /* Var */1 :
             instr_text = "var " + String(i$1._0);
             break;
-        default:
-          throw {
-                RE_EXN_ID: "Match_failure",
-                _1: [
-                  "Demo.res",
-                  326,
-                  23
-                ],
-                Error: new Error()
-              };
+        case /* Call */2 :
+            instr_text = "call/" + String(i$1._1) + " " + i$1._0;
+            break;
+        case /* Ret */3 :
+            instr_text = "ret " + String(i$1._0);
+            break;
+        case /* Goto */4 :
+            instr_text = "goto " + i$1._0;
+            break;
+        case /* Label */5 :
+            instr_text = i$1._0 + ":";
+            break;
+        
       }
     }
     console.log(instr_text);
@@ -883,9 +833,11 @@ var Vm = {
   instr_goto: 8,
   instr_if_zero: 9,
   instr_exit: 10,
-  $$eval: $$eval$1,
   find_local_index: find_local_index$1,
-  compile_ast: compile_ast,
+  preprocess: preprocess,
+  compile_expr: compile_expr,
+  compile_fun: compile_fun,
+  compile_prog: compile_prog,
   get_instr_size: get_instr_size,
   to_hex: to_hex,
   to_bytecode: to_bytecode,
@@ -989,7 +941,7 @@ function compile_vm(instrs) {
                 RE_EXN_ID: "Match_failure",
                 _1: [
                   "Demo.res",
-                  348,
+                  407,
                   6
                 ],
                 Error: new Error()
@@ -1051,7 +1003,7 @@ function compile_vm(instrs) {
                 RE_EXN_ID: "Match_failure",
                 _1: [
                   "Demo.res",
-                  348,
+                  407,
                   6
                 ],
                 Error: new Error()
@@ -1182,7 +1134,7 @@ function generate(instrs) {
                               RE_EXN_ID: "Assert_failure",
                               _1: [
                                 "Demo.res",
-                                404,
+                                463,
                                 17
                               ],
                               Error: new Error()
@@ -1228,7 +1180,7 @@ function generate(instrs) {
                                   RE_EXN_ID: "Assert_failure",
                                   _1: [
                                     "Demo.res",
-                                    419,
+                                    478,
                                     19
                                   ],
                                   Error: new Error()
@@ -1254,7 +1206,7 @@ function generate(instrs) {
                                   RE_EXN_ID: "Assert_failure",
                                   _1: [
                                     "Demo.res",
-                                    426,
+                                    485,
                                     19
                                   ],
                                   Error: new Error()
@@ -1282,7 +1234,7 @@ function generate(instrs) {
                           RE_EXN_ID: "Assert_failure",
                           _1: [
                             "Demo.res",
-                            430,
+                            489,
                             15
                           ],
                           Error: new Error()
@@ -1382,7 +1334,7 @@ function generate(instrs) {
           RE_EXN_ID: "Assert_failure",
           _1: [
             "Demo.res",
-            443,
+            502,
             13
           ],
           Error: new Error()
@@ -1478,97 +1430,53 @@ var Native = {
 };
 
 var my_expr = {
-  TAG: /* Mul */2,
-  _0: {
-    TAG: /* Add */1,
-    _0: {
-      TAG: /* Cst */0,
-      _0: 1
-    },
-    _1: {
-      TAG: /* Cst */0,
-      _0: 3
-    }
-  },
+  TAG: /* Let */4,
+  _0: "add",
   _1: {
-    TAG: /* Let */4,
-    _0: "x",
-    _1: {
-      TAG: /* Add */1,
-      _0: {
-        TAG: /* Cst */0,
-        _0: 1
-      },
-      _1: {
-        TAG: /* Cst */0,
-        _0: 2
+    TAG: /* Fn */5,
+    _0: {
+      hd: "a",
+      tl: {
+        hd: "b",
+        tl: /* [] */0
       }
     },
-    _2: {
+    _1: {
       TAG: /* Add */1,
       _0: {
         TAG: /* Var */3,
-        _0: "x"
+        _0: "a"
       },
       _1: {
-        TAG: /* Let */4,
-        _0: "y",
-        _1: {
-          TAG: /* Add */1,
-          _0: {
-            TAG: /* Cst */0,
-            _0: 1
-          },
-          _1: {
-            TAG: /* Cst */0,
-            _0: 1
-          }
+        TAG: /* Var */3,
+        _0: "b"
+      }
+    }
+  },
+  _2: {
+    TAG: /* App */6,
+    _0: "add",
+    _1: {
+      hd: {
+        TAG: /* Cst */0,
+        _0: 1
+      },
+      tl: {
+        hd: {
+          TAG: /* Cst */0,
+          _0: 2
         },
-        _2: {
-          TAG: /* Add */1,
-          _0: {
-            TAG: /* Var */3,
-            _0: "x"
-          },
-          _1: {
-            TAG: /* Var */3,
-            _0: "y"
-          }
-        }
+        tl: /* [] */0
       }
     }
   }
 };
 
-var my_nameless = compile(my_expr);
-
-console.log("Nameless:");
-
-console.log(print(my_nameless));
-
-var my_indexed = compile$1(my_nameless);
-
-console.log("==> Indexed:");
-
-console.log(print$1(my_indexed));
-
-var instrs = compile_indexed(my_indexed);
-
-var instrs2 = compile_ast(my_expr);
-
-console.log("==> multi-level ir:");
-
-print$2(instrs);
+var instrs2 = compile_prog(my_expr);
 
 console.log("==> single pass:");
 
 print$2(instrs2);
-
-console.log($$eval(my_expr));
-
-console.log($$eval$1(instrs, /* [] */0));
-
-console.log($$eval$1(instrs2, /* [] */0));
 
 var bytecode = to_hex(to_bytecode(Belt_List.concatMany([
               instrs2,
@@ -1580,20 +1488,6 @@ var bytecode = to_hex(to_bytecode(Belt_List.concatMany([
 
 Fs.writeFileSync("bytecode.bin", bytecode, "hex");
 
-var assembly = optimize(compile_vm(instrs2));
-
-console.log("==> native ir:");
-
-print$3(assembly);
-
-console.log("==> machine code:");
-
-var machine_code = to_hex$1(generate(assembly));
-
-console.log(machine_code);
-
-Fs.writeFileSync("machine_code.bin", machine_code, "hex");
-
 export {
   findIndex ,
   to_little_endian_32 ,
@@ -1603,12 +1497,7 @@ export {
   Vm ,
   Native ,
   my_expr ,
-  my_nameless ,
-  my_indexed ,
-  instrs ,
   instrs2 ,
   bytecode ,
-  assembly ,
-  machine_code ,
 }
-/* my_nameless Not a pure module */
+/* instrs2 Not a pure module */
