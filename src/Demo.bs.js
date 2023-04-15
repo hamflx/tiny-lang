@@ -1262,8 +1262,14 @@ function compile_vm(instrs) {
                   };
         case /* Exit */6 :
             return {
-                    hd: /* Ret */0,
-                    tl: /* [] */0
+                    hd: {
+                      TAG: /* Pop */3,
+                      _0: /* Rax */1
+                    },
+                    tl: {
+                      hd: /* Ret */0,
+                      tl: /* [] */0
+                    }
                   };
         
       }
@@ -1324,22 +1330,40 @@ function compile_vm(instrs) {
                       TAG: /* Call */12,
                       _0: instr._0
                     },
-                    tl: /* [] */0
+                    tl: {
+                      hd: {
+                        TAG: /* Push */2,
+                        _0: /* Rax */1
+                      },
+                      tl: /* [] */0
+                    }
                   };
         case /* Ret */3 :
             var n = instr._0;
             if (n !== 0) {
               return {
                       hd: {
-                        TAG: /* Retn */10,
-                        _0: n
+                        TAG: /* Pop */3,
+                        _0: /* Rax */1
                       },
-                      tl: /* [] */0
+                      tl: {
+                        hd: {
+                          TAG: /* Retn */10,
+                          _0: (n << 3)
+                        },
+                        tl: /* [] */0
+                      }
                     };
             } else {
               return {
-                      hd: /* Ret */0,
-                      tl: /* [] */0
+                      hd: {
+                        TAG: /* Pop */3,
+                        _0: /* Rax */1
+                      },
+                      tl: {
+                        hd: /* Ret */0,
+                        tl: /* [] */0
+                      }
                     };
             }
         case /* IfZero */4 :
@@ -1418,19 +1442,7 @@ function compile_vm(instrs) {
                 compile_inner(instrs.tl)
               ]);
   };
-  return Belt_List.concatMany([
-              compile_inner(instrs),
-              {
-                hd: {
-                  TAG: /* Pop */3,
-                  _0: /* Rax */1
-                },
-                tl: {
-                  hd: /* Ret */0,
-                  tl: /* [] */0
-                }
-              }
-            ]);
+  return compile_inner(instrs);
 }
 
 function optimize(instrs) {

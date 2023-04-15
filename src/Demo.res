@@ -577,10 +577,10 @@ module Native = {
         }
       | Vm.Pop => list{Pop(Rax)}
       | Vm.Swap => list{Pop(Rax), Pop(Rbx), Push(Rax), Push(Rbx)}
-      | Ret(0) => list{Ret}
-      | Ret(n) => list{Retn(n)}
-      | Exit => list{Ret}
-      | Call(label, _) => list{Call(label)}
+      | Ret(0) => list{Pop(Rax), Ret}
+      | Ret(n) => list{Pop(Rax), Retn(n * 8)}
+      | Exit => list{Pop(Rax), Ret}
+      | Call(label, _) => list{Call(label), Push(Rax)}
       | Goto(label) => list{Goto(label)}
       | IfZero(label) => list{Pop(Rax), Test(Rax, Rax), Je(label)}
       | Label(label) => list{Label(label)}
@@ -594,7 +594,7 @@ module Native = {
       | list{head, ...tail} => list{...compile_instr(head), ...compile_inner(tail)}
       }
     }
-    list{...compile_inner(instrs), Pop(Rax), Ret}
+    compile_inner(instrs)
   }
 
   let optimize = (instrs: instrs) => {
