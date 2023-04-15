@@ -112,11 +112,30 @@ var last_id = {
   contents: 0
 };
 
-function gen_ident(name) {
+function new_var_ident(name) {
   last_id.contents = last_id.contents + 1 | 0;
   return {
           name: name,
-          stamp: last_id.contents
+          stamp: last_id.contents,
+          ty: /* Var */2
+        };
+}
+
+function new_branch_ident(name) {
+  last_id.contents = last_id.contents + 1 | 0;
+  return {
+          name: name,
+          stamp: last_id.contents,
+          ty: /* Branch */0
+        };
+}
+
+function new_fn_ident(name) {
+  last_id.contents = last_id.contents + 1 | 0;
+  return {
+          name: name,
+          stamp: last_id.contents,
+          ty: /* Function */1
         };
 }
 
@@ -152,8 +171,10 @@ function compile(expr) {
                   _0: List.assoc(expr._0, env)
                 };
       case /* Let */5 :
+          var e1 = expr._1;
           var name = expr._0;
-          var ident = gen_ident(name);
+          var ident;
+          ident = e1.TAG === /* Fn */6 ? new_fn_ident(name) : new_var_ident(name);
           var env_0 = [
             name,
             ident
@@ -165,12 +186,12 @@ function compile(expr) {
           return {
                   TAG: /* Let */5,
                   _0: ident,
-                  _1: compile_inner(expr._1, env$1),
+                  _1: compile_inner(e1, env$1),
                   _2: compile_inner(expr._2, env$1)
                 };
       case /* Fn */6 :
           var params = expr._0;
-          var idents = Belt_List.map(params, gen_ident);
+          var idents = Belt_List.map(params, new_var_ident);
           var mapping = Belt_List.zip(params, idents);
           return {
                   TAG: /* Fn */6,
@@ -209,7 +230,9 @@ function compile(expr) {
 
 var Resolve = {
   last_id: last_id,
-  gen_ident: gen_ident,
+  new_var_ident: new_var_ident,
+  new_branch_ident: new_branch_ident,
+  new_fn_ident: new_fn_ident,
   compile: compile
 };
 
@@ -366,7 +389,7 @@ var Indexed = {
   print: print$1
 };
 
-var ident_main = gen_ident("main");
+var ident_main = new_fn_ident("main");
 
 function find_local_index$1(env, name) {
   var _env = env;
@@ -377,7 +400,8 @@ function find_local_index$1(env, name) {
     if (env$1) {
       var head = env$1.hd;
       if (head) {
-        if (head._0.stamp === name.stamp) {
+        var head$1 = head._0;
+        if (head$1.stamp === name.stamp && head$1.ty === name.ty) {
           return stack_index;
         }
         _stack_index = stack_index + 1 | 0;
@@ -496,7 +520,7 @@ function preprocess(expr) {
                 RE_EXN_ID: "Assert_failure",
                 _1: [
                   "Demo.res",
-                  342,
+                  356,
                   20
                 ],
                 Error: new Error()
@@ -685,8 +709,8 @@ function compile_expr(expr, env) {
                       }
                     ]);
       case /* If */8 :
-          var false_label = gen_ident("false");
-          var end_of_if = gen_ident("end_of_if");
+          var false_label = new_branch_ident("false");
+          var end_of_if = new_branch_ident("end_of_if");
           return Belt_List.concatMany([
                       compile_inner(expr._0, env, if_label + 1 | 0),
                       {
@@ -983,7 +1007,7 @@ function compile_indexed(expr) {
               RE_EXN_ID: "Match_failure",
               _1: [
                 "Demo.res",
-                494,
+                508,
                 4
               ],
               Error: new Error()
@@ -1220,7 +1244,7 @@ function compile_vm(instrs) {
                           },
                           tl: {
                             hd: {
-                              TAG: /* Movzbq */1,
+                              TAG: /* Movzx */1,
                               _0: /* Rbx */2,
                               _1: /* Al */0
                             },
@@ -1489,31 +1513,33 @@ function print$3(instrs) {
           }
           switch (instr.TAG | 0) {
             case /* Mov */0 :
-                return "movq " + to_reg_str(instr._0) + ", " + to_mov_arg_str(instr._1);
-            case /* Movzbq */1 :
-                return "movzbq " + to_reg_str(instr._0) + ", " + to_reg_str(instr._1);
+                return "mov " + to_reg_str(instr._0) + ", " + to_mov_arg_str(instr._1);
+            case /* Movzx */1 :
+                return "movzx " + to_reg_str(instr._0) + ", " + to_reg_str(instr._1);
             case /* Push */2 :
-                return "pushq " + to_reg_str(instr._0);
+                return "push " + to_reg_str(instr._0);
             case /* Pop */3 :
-                return "popq " + to_reg_str(instr._0);
+                return "pop " + to_reg_str(instr._0);
             case /* Add */4 :
-                return "addq " + to_reg_str(instr._0) + ", " + to_reg_str(instr._1);
+                return "add " + to_reg_str(instr._0) + ", " + to_reg_str(instr._1);
             case /* Sub */5 :
-                return "subq " + to_reg_str(instr._0) + ", " + to_reg_str(instr._1);
+                return "sub " + to_reg_str(instr._0) + ", " + to_reg_str(instr._1);
             case /* Mul */6 :
-                return "mulq " + to_reg_str(instr._0);
+                return "mul " + to_reg_str(instr._0);
             case /* Test */7 :
-                return "testq " + to_reg_str(instr._0) + ", " + to_reg_str(instr._1);
+                return "test " + to_reg_str(instr._0) + ", " + to_reg_str(instr._1);
             case /* Cmp */8 :
-                return "cmpq " + to_reg_str(instr._0) + ", " + to_reg_str(instr._1);
+                return "cmp " + to_reg_str(instr._0) + ", " + to_reg_str(instr._1);
             case /* Setna */9 :
                 return "setna " + to_reg_str(instr._0);
             case /* Retn */10 :
-                return "retq " + String(instr._0);
+                return "ret " + String(instr._0);
             case /* Label */11 :
-                return get_label(instr._0) + ":";
+                var label = instr._0;
+                var props = label.ty === /* Function */1 ? ".def " + get_label(label) + ";\n.scl 2;\n.type 32;\n.endef\n" : "";
+                return props + get_label(label) + ":";
             case /* Call */12 :
-                return "callq " + get_label(instr._0);
+                return "call " + get_label(instr._0);
             case /* Goto */13 :
                 return "jmp " + get_label(instr._0);
             case /* Je */14 :

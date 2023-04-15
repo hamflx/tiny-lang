@@ -4,8 +4,7 @@
 .bsb.lock
 .merlin
 
-/machine_code.s
-/machine_code.bin
+/machine_code.*
 /test.o
 /bytecode.bin
 

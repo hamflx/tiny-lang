@@ -76,7 +76,8 @@ module Ast = {
 }
 
 module Resolve = {
-  type ident = {name: string, stamp: int}
+  type ident_type = Branch | Function | Var
+  type ident = {name: string, stamp: int, ty: ident_type}
 
   type rec expr =
     | Cst(int)
@@ -94,9 +95,19 @@ module Resolve = {
 
   let last_id = ref(0)
 
-  let gen_ident = (name: string): ident => {
+  let new_var_ident = (name: string): ident => {
     last_id := last_id.contents + 1
-    {name, stamp: last_id.contents}
+    {name, stamp: last_id.contents, ty: Var}
+  }
+
+  let new_branch_ident = (name: string): ident => {
+    last_id := last_id.contents + 1
+    {name, stamp: last_id.contents, ty: Branch}
+  }
+
+  let new_fn_ident = (name: string): ident => {
+    last_id := last_id.contents + 1
+    {name, stamp: last_id.contents, ty: Function}
   }
 
   let compile = (expr: Ast.expr) => {
@@ -109,12 +120,15 @@ module Resolve = {
       | Le(a, b) => Le(compile_inner(a, env), compile_inner(b, env))
       | Var(name) => Var(List.assoc(name, env))
       | Let(name, e1, e2) => {
-          let ident = gen_ident(name)
+          let ident = switch e1 {
+          | Fn(_, _) => new_fn_ident(name)
+          | _ => new_var_ident(name)
+          }
           let env = list{(name, ident), ...env}
           Let(ident, compile_inner(e1, env), compile_inner(e2, env))
         }
       | Fn(params, body) => {
-          let idents = params->Belt.List.map(gen_ident)
+          let idents = params->Belt.List.map(new_var_ident)
           let mapping = Belt.List.zip(params, idents)
           Fn(idents, compile_inner(body, list{...mapping, ...env}))
         }
@@ -286,12 +300,12 @@ module Vm = {
     | Le(expr, expr)
     | If(expr, expr, expr)
 
-  let ident_main = Resolve.gen_ident("main")
+  let ident_main = Resolve.new_fn_ident("main")
 
   let find_local_index = (env: senv, name: Resolve.ident) => {
     let rec find_recursive = (env: senv, stack_index: int) => {
       switch env {
-      | list{Slocal(head), ..._} if head.stamp === name.stamp => stack_index
+      | list{Slocal(head), ..._} if head.stamp === name.stamp && head.ty === name.ty => stack_index
       | list{_, ...tail} => find_recursive(tail, stack_index + 1)
       | _ => raise(Not_found)
       }
@@ -404,8 +418,8 @@ module Vm = {
           Le,
         }
       | If(cond, pos_expr, neg_expr) => {
-          let false_label = Resolve.gen_ident("false")
-          let end_of_if = Resolve.gen_ident("end_of_if")
+          let false_label = Resolve.new_branch_ident("false")
+          let end_of_if = Resolve.new_branch_ident("end_of_if")
           list{
             ...compile_inner(cond, env, if_label + 1),
             IfZero(false_label),
@@ -529,7 +543,7 @@ module Native = {
     Constant(int) | Reg(reg) | Addr(int) | RegOffset({base: reg, index: reg, scale: int, disp: int})
   type instr =
     | Mov(reg, mov_arg)
-    | Movzbq(reg, reg)
+    | Movzx(reg, reg)
     | Push(reg)
     | Pop(reg)
     | Add(reg, reg)
@@ -553,7 +567,7 @@ module Native = {
       | Vm.Cst(i) => list{Mov(Rax, Constant(i)), Push(Rax)}
       | Vm.Add => list{Pop(Rax), Pop(Rbx), Add(Rax, Rbx), Push(Rax)}
       | Vm.Sub => list{Pop(Rbx), Pop(Rax), Sub(Rax, Rbx), Push(Rax)}
-      | Vm.Le => list{Pop(Rbx), Pop(Rax), Cmp(Rax, Rbx), Setna(Al), Movzbq(Rbx, Al), Push(Rbx)}
+      | Vm.Le => list{Pop(Rbx), Pop(Rax), Cmp(Rax, Rbx), Setna(Al), Movzx(Rbx, Al), Push(Rbx)}
       | Vm.Mul => list{Pop(Rax), Pop(Rbx), Mul(Rbx), Push(Rax)}
       | Vm.Var(i) =>
         list{
@@ -637,21 +651,28 @@ module Native = {
     let instr_text = instrs->Belt.List.map(instr =>
       switch instr {
       | Setna(reg) => "setna " ++ to_reg_str(reg)
-      | Label(label) => get_label(label) ++ ":"
-      | Mov(reg, arg) => "movq " ++ to_reg_str(reg) ++ ", " ++ to_mov_arg_str(arg)
-      | Movzbq(r1, r2) => "movzbq " ++ to_reg_str(r1) ++ ", " ++ to_reg_str(r2)
-      | Push(reg) => "pushq " ++ to_reg_str(reg)
-      | Pop(reg) => "popq " ++ to_reg_str(reg)
-      | Add(r1, r2) => "addq " ++ to_reg_str(r1) ++ ", " ++ to_reg_str(r2)
-      | Sub(r1, r2) => "subq " ++ to_reg_str(r1) ++ ", " ++ to_reg_str(r2)
-      | Mul(reg) => "mulq " ++ to_reg_str(reg)
-      | Cmp(r1, r2) => "cmpq " ++ to_reg_str(r1) ++ ", " ++ to_reg_str(r2)
-      | Test(r1, r2) => "testq " ++ to_reg_str(r1) ++ ", " ++ to_reg_str(r2)
-      | Call(label) => "callq " ++ get_label(label)
+      | Label(label) => {
+          let props = if label.ty === Resolve.Function {
+            ".def " ++ get_label(label) ++ ";\n.scl 2;\n.type 32;\n.endef\n"
+          } else {
+            ""
+          }
+          props ++ get_label(label) ++ ":"
+        }
+      | Mov(reg, arg) => "mov " ++ to_reg_str(reg) ++ ", " ++ to_mov_arg_str(arg)
+      | Movzx(r1, r2) => "movzx " ++ to_reg_str(r1) ++ ", " ++ to_reg_str(r2)
+      | Push(reg) => "push " ++ to_reg_str(reg)
+      | Pop(reg) => "pop " ++ to_reg_str(reg)
+      | Add(r1, r2) => "add " ++ to_reg_str(r1) ++ ", " ++ to_reg_str(r2)
+      | Sub(r1, r2) => "sub " ++ to_reg_str(r1) ++ ", " ++ to_reg_str(r2)
+      | Mul(reg) => "mul " ++ to_reg_str(reg)
+      | Cmp(r1, r2) => "cmp " ++ to_reg_str(r1) ++ ", " ++ to_reg_str(r2)
+      | Test(r1, r2) => "test " ++ to_reg_str(r1) ++ ", " ++ to_reg_str(r2)
+      | Call(label) => "call " ++ get_label(label)
       | Goto(label) => "jmp " ++ get_label(label)
       | Je(label) => "je " ++ get_label(label)
       | Ret => "ret"
-      | Retn(n) => "retq " ++ n->Belt.Int.toString
+      | Retn(n) => "ret " ++ n->Belt.Int.toString
       }
     )
     instr_text->Belt.List.reduce(".intel_syntax noprefix\n", (res, ins) => res ++ ins ++ "\n")
