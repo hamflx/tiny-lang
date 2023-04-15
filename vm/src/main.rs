@@ -97,8 +97,25 @@ impl Vm {
                     self.stack[self.sp as usize - 1] = top;
                     self.pc += 1;
                 }
-                Instruction::Call => todo!(),
-                Instruction::Ret => todo!(),
+                Instruction::Call => {
+                    let ret_addr = self.pc + 3;
+                    self.push(ret_addr);
+
+                    let target = self.code[self.pc as usize + 1];
+                    let _ = self.code[self.pc as usize + 2];
+                    self.pc = target;
+                }
+                Instruction::Ret => {
+                    let n = self.code[self.pc as usize + 1];
+
+                    let ret_value = self.pop();
+                    let ret_addr = self.pop();
+
+                    self.sp -= n;
+
+                    self.push(ret_value);
+                    self.pc = ret_addr;
+                }
                 Instruction::Goto => todo!(),
                 Instruction::IfZero => todo!(),
                 Instruction::Exit => {
@@ -107,6 +124,17 @@ impl Vm {
                 }
             }
         }
+    }
+
+    fn push(&mut self, value: u32) {
+        self.sp += 1;
+        self.stack[self.sp as usize] = value;
+    }
+
+    fn pop(&mut self) -> u32 {
+        let value = self.stack[self.sp as usize];
+        self.sp -= 1;
+        value
     }
 }
 
