@@ -108,6 +108,111 @@ var Ast = {
   vmul: vmul
 };
 
+var last_id = {
+  contents: 0
+};
+
+function gen_ident(name) {
+  last_id.contents = last_id.contents + 1 | 0;
+  return {
+          name: name,
+          stamp: last_id.contents
+        };
+}
+
+function compile(expr) {
+  var compile_inner = function (expr, env) {
+    switch (expr.TAG | 0) {
+      case /* Cst */0 :
+          return {
+                  TAG: /* Cst */0,
+                  _0: expr._0
+                };
+      case /* Add */1 :
+          return {
+                  TAG: /* Add */1,
+                  _0: compile_inner(expr._0, env),
+                  _1: compile_inner(expr._1, env)
+                };
+      case /* Sub */2 :
+          return {
+                  TAG: /* Sub */2,
+                  _0: compile_inner(expr._0, env),
+                  _1: compile_inner(expr._1, env)
+                };
+      case /* Mul */3 :
+          return {
+                  TAG: /* Mul */3,
+                  _0: compile_inner(expr._0, env),
+                  _1: compile_inner(expr._1, env)
+                };
+      case /* Var */4 :
+          return {
+                  TAG: /* Var */4,
+                  _0: List.assoc(expr._0, env)
+                };
+      case /* Let */5 :
+          var name = expr._0;
+          var ident = gen_ident(name);
+          var env_0 = [
+            name,
+            ident
+          ];
+          var env$1 = {
+            hd: env_0,
+            tl: env
+          };
+          return {
+                  TAG: /* Let */5,
+                  _0: ident,
+                  _1: compile_inner(expr._1, env$1),
+                  _2: compile_inner(expr._2, env$1)
+                };
+      case /* Fn */6 :
+          var params = expr._0;
+          var idents = Belt_List.map(params, gen_ident);
+          var mapping = Belt_List.zip(params, idents);
+          return {
+                  TAG: /* Fn */6,
+                  _0: idents,
+                  _1: compile_inner(expr._1, Belt_List.concatMany([
+                            mapping,
+                            env
+                          ]))
+                };
+      case /* App */7 :
+          return {
+                  TAG: /* App */7,
+                  _0: List.assoc(expr._0, env),
+                  _1: Belt_List.map(expr._1, (function (item) {
+                          return compile_inner(item, env);
+                        }))
+                };
+      case /* Le */8 :
+          return {
+                  TAG: /* Le */8,
+                  _0: compile_inner(expr._0, env),
+                  _1: compile_inner(expr._1, env)
+                };
+      case /* If */9 :
+          return {
+                  TAG: /* If */9,
+                  _0: compile_inner(expr._0, env),
+                  _1: compile_inner(expr._1, env),
+                  _2: compile_inner(expr._2, env)
+                };
+      
+    }
+  };
+  return compile_inner(expr, /* [] */0);
+}
+
+var Resolve = {
+  last_id: last_id,
+  gen_ident: gen_ident,
+  compile: compile
+};
+
 function print(expr) {
   var go = function (expr) {
     switch (expr.TAG | 0) {
@@ -166,7 +271,7 @@ function find_local_index(env, local_index) {
   };
 }
 
-function compile(expr) {
+function compile$1(expr) {
   var go = function (expr, env) {
     switch (expr.TAG | 0) {
       case /* Cst */0 :
@@ -257,9 +362,11 @@ function print$1(expr) {
 
 var Indexed = {
   find_local_index: find_local_index,
-  compile: compile,
+  compile: compile$1,
   print: print$1
 };
+
+var ident_main = gen_ident("main");
 
 function find_local_index$1(env, name) {
   var _env = env;
@@ -270,7 +377,7 @@ function find_local_index$1(env, name) {
     if (env$1) {
       var head = env$1.hd;
       if (head) {
-        if (head._0 === name) {
+        if (head._0.stamp === name.stamp) {
           return stack_index;
         }
         _stack_index = stack_index + 1 | 0;
@@ -389,7 +496,7 @@ function preprocess(expr) {
                 RE_EXN_ID: "Assert_failure",
                 _1: [
                   "Demo.res",
-                  287,
+                  342,
                   20
                 ],
                 Error: new Error()
@@ -456,7 +563,7 @@ function preprocess(expr) {
   var match = preprocess_rec(expr);
   return {
           hd: [
-            "main",
+            ident_main,
             /* [] */0,
             match[0]
           ],
@@ -578,8 +685,8 @@ function compile_expr(expr, env) {
                       }
                     ]);
       case /* If */8 :
-          var false_label = "false_" + String(if_label);
-          var end_of_if = "end_of_if_" + String(if_label);
+          var false_label = gen_ident("false");
+          var end_of_if = gen_ident("end_of_if");
           return Belt_List.concatMany([
                       compile_inner(expr._0, env, if_label + 1 | 0),
                       {
@@ -645,11 +752,12 @@ function compile_fun(fun) {
 }
 
 function compile_prog(expr) {
-  var fns = Belt_List.flatten(Belt_List.map(preprocess(expr), compile_fun));
+  var expr$1 = compile(expr);
+  var fns = Belt_List.flatten(Belt_List.map(preprocess(expr$1), compile_fun));
   return {
           hd: {
             TAG: /* Call */2,
-            _0: "main",
+            _0: ident_main,
             _1: 0
           },
           tl: {
@@ -875,7 +983,7 @@ function compile_indexed(expr) {
               RE_EXN_ID: "Match_failure",
               _1: [
                 "Demo.res",
-                438,
+                494,
                 4
               ],
               Error: new Error()
@@ -922,19 +1030,19 @@ function print$2(instrs) {
             instr_text = "var " + String(i$1._0);
             break;
         case /* Call */2 :
-            instr_text = "call/" + String(i$1._1) + " " + i$1._0;
+            instr_text = "call/" + String(i$1._1) + " " + i$1._0.name;
             break;
         case /* Ret */3 :
             instr_text = "ret " + String(i$1._0);
             break;
         case /* IfZero */4 :
-            instr_text = "if_zero " + i$1._0;
+            instr_text = "if_zero " + i$1._0.name;
             break;
         case /* Goto */5 :
-            instr_text = "goto " + i$1._0;
+            instr_text = "goto " + i$1._0.name;
             break;
         case /* Label */6 :
-            instr_text = i$1._0 + ":";
+            instr_text = i$1._0.name + ":";
             break;
         
       }
@@ -957,6 +1065,7 @@ var Vm = {
   instr_exit: 10,
   instr_sub: 11,
   instr_le: 12,
+  ident_main: ident_main,
   find_local_index: find_local_index$1,
   preprocess: preprocess,
   compile_expr: compile_expr,
@@ -1065,7 +1174,7 @@ function compile_vm(instrs) {
                 RE_EXN_ID: "Match_failure",
                 _1: [
                   "Demo.res",
-                  479,
+                  535,
                   6
                 ],
                 Error: new Error()
@@ -1127,7 +1236,7 @@ function compile_vm(instrs) {
                 RE_EXN_ID: "Match_failure",
                 _1: [
                   "Demo.res",
-                  479,
+                  535,
                   6
                 ],
                 Error: new Error()
@@ -1258,7 +1367,7 @@ function generate(instrs) {
                               RE_EXN_ID: "Assert_failure",
                               _1: [
                                 "Demo.res",
-                                535,
+                                591,
                                 17
                               ],
                               Error: new Error()
@@ -1304,7 +1413,7 @@ function generate(instrs) {
                                   RE_EXN_ID: "Assert_failure",
                                   _1: [
                                     "Demo.res",
-                                    550,
+                                    606,
                                     19
                                   ],
                                   Error: new Error()
@@ -1330,7 +1439,7 @@ function generate(instrs) {
                                   RE_EXN_ID: "Assert_failure",
                                   _1: [
                                     "Demo.res",
-                                    557,
+                                    613,
                                     19
                                   ],
                                   Error: new Error()
@@ -1358,7 +1467,7 @@ function generate(instrs) {
                           RE_EXN_ID: "Assert_failure",
                           _1: [
                             "Demo.res",
-                            561,
+                            617,
                             15
                           ],
                           Error: new Error()
@@ -1458,7 +1567,7 @@ function generate(instrs) {
           RE_EXN_ID: "Assert_failure",
           _1: [
             "Demo.res",
-            574,
+            630,
             13
           ],
           Error: new Error()
@@ -1653,6 +1762,7 @@ export {
   findIndex ,
   to_little_endian_32 ,
   Ast ,
+  Resolve ,
   Nameless ,
   Indexed ,
   Vm ,
@@ -1661,4 +1771,4 @@ export {
   instrs2 ,
   bytecode ,
 }
-/* instrs2 Not a pure module */
+/* ident_main Not a pure module */

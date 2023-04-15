@@ -75,6 +75,59 @@ module Ast = {
   // }
 }
 
+module Resolve = {
+  type ident = {name: string, stamp: int}
+
+  type rec expr =
+    | Cst(int)
+    | Add(expr, expr)
+    | Sub(expr, expr)
+    | Mul(expr, expr)
+    | Var(ident)
+    | Let(ident, expr, expr)
+    | Fn(list<ident>, expr)
+    | App(ident, list<expr>)
+    | Le(expr, expr)
+    | If(expr, expr, expr)
+
+  type env = list<(string, ident)>
+
+  let last_id = ref(0)
+
+  let gen_ident = (name: string): ident => {
+    last_id := last_id.contents + 1
+    {name, stamp: last_id.contents}
+  }
+
+  let compile = (expr: Ast.expr) => {
+    let rec compile_inner = (expr: Ast.expr, env: env) => {
+      switch expr {
+      | Cst(i) => Cst(i)
+      | Add(a, b) => Add(compile_inner(a, env), compile_inner(b, env))
+      | Sub(a, b) => Sub(compile_inner(a, env), compile_inner(b, env))
+      | Mul(a, b) => Mul(compile_inner(a, env), compile_inner(b, env))
+      | Le(a, b) => Le(compile_inner(a, env), compile_inner(b, env))
+      | Var(name) => Var(List.assoc(name, env))
+      | Let(name, e1, e2) => {
+          let ident = gen_ident(name)
+          let env = list{(name, ident), ...env}
+          Let(ident, compile_inner(e1, env), compile_inner(e2, env))
+        }
+      | Fn(params, body) => {
+          let idents = params->Belt.List.map(gen_ident)
+          let mapping = Belt.List.zip(params, idents)
+          Fn(idents, compile_inner(body, list{...mapping, ...env}))
+        }
+      | App(fn_name, args) =>
+        App(List.assoc(fn_name, env), args->Belt.List.map(item => compile_inner(item, env)))
+      | If(cond, truthy, falsy) =>
+        If(compile_inner(cond, env), compile_inner(truthy, env), compile_inner(falsy, env))
+      }
+    }
+    compile_inner(expr, list{})
+  }
+}
+
 module Nameless = {
   type rec expr =
     | Cst(int)
@@ -194,13 +247,13 @@ module Vm = {
     | Var(int)
     | Pop
     | Swap
-    | Call(string, int)
+    | Call(Resolve.ident, int)
     | Ret(int)
     | Le
-    | IfZero(string)
-    | Goto(string)
+    | IfZero(Resolve.ident)
+    | Goto(Resolve.ident)
     | Exit
-    | Label(string)
+    | Label(Resolve.ident)
   type instrs = list<instr>
   type operand = int
   type stack = list<operand>
@@ -219,7 +272,7 @@ module Vm = {
   let instr_sub = 11
   let instr_le = 12
 
-  type sv = Slocal(string) | Stmp
+  type sv = Slocal(Resolve.ident) | Stmp
   type senv = list<sv>
 
   type rec expr =
@@ -227,16 +280,18 @@ module Vm = {
     | Add(expr, expr)
     | Sub(expr, expr)
     | Mul(expr, expr)
-    | Var(string)
-    | Let(string, expr, expr)
-    | App(string, list<expr>)
+    | Var(Resolve.ident)
+    | Let(Resolve.ident, expr, expr)
+    | App(Resolve.ident, list<expr>)
     | Le(expr, expr)
     | If(expr, expr, expr)
 
-  let find_local_index = (env: senv, name: string) => {
+  let ident_main = Resolve.gen_ident("main")
+
+  let find_local_index = (env: senv, name: Resolve.ident) => {
     let rec find_recursive = (env: senv, stack_index: int) => {
       switch env {
-      | list{Slocal(head), ..._} if head === name => stack_index
+      | list{Slocal(head), ..._} if head.stamp === name.stamp => stack_index
       | list{_, ...tail} => find_recursive(tail, stack_index + 1)
       | _ => raise(Not_found)
       }
@@ -244,11 +299,11 @@ module Vm = {
     find_recursive(env, 0)
   }
 
-  type fun = (string, list<string>, expr)
+  type fun = (Resolve.ident, list<Resolve.ident>, expr)
   type prog = list<fun>
 
-  let preprocess = (expr: Ast.expr): list<fun> => {
-    let rec preprocess_rec = (expr: Ast.expr): (expr, list<fun>) => {
+  let preprocess = (expr: Resolve.expr): list<fun> => {
+    let rec preprocess_rec = (expr: Resolve.expr): (expr, list<fun>) => {
       switch expr {
       | Cst(i) => (Cst(i), list{})
       | Var(binding) => (Var(binding), list{})
@@ -299,7 +354,7 @@ module Vm = {
       }
     }
     let (main, fns) = preprocess_rec(expr)
-    list{("main", list{}, main), ...fns}
+    list{(ident_main, list{}, main), ...fns}
   }
 
   let compile_expr = (expr: expr, env: senv): instrs => {
@@ -349,8 +404,8 @@ module Vm = {
           Le,
         }
       | If(cond, pos_expr, neg_expr) => {
-          let false_label = "false_" ++ if_label->Belt.Int.toString
-          let end_of_if = "end_of_if_" ++ if_label->Belt.Int.toString
+          let false_label = Resolve.gen_ident("false")
+          let end_of_if = Resolve.gen_ident("end_of_if")
           list{
             ...compile_inner(cond, env, if_label + 1),
             IfZero(false_label),
@@ -373,8 +428,9 @@ module Vm = {
   }
 
   let compile_prog = (expr: Ast.expr): instrs => {
+    let expr = Resolve.compile(expr)
     let fns = preprocess(expr)->Belt.List.map(fn => compile_fun(fn))->Belt.List.flatten
-    list{Call("main", 0), Exit, ...fns}
+    list{Call(ident_main, 0), Exit, ...fns}
   }
 
   let get_instr_size = (instr: instr) => {
@@ -404,7 +460,7 @@ module Vm = {
       | _ => (label_map, pos + item->get_instr_size)
       }
     })
-    let compile_instr = (instr: instr, label_map: list<(string, int)>) => {
+    let compile_instr = (instr: instr, label_map: list<(Resolve.ident, int)>) => {
       switch instr {
       | Label(_) => list{}
       | Cst(i) => list{instr_const, i}
@@ -453,12 +509,12 @@ module Vm = {
       | Var(i) => "var " ++ Belt.Int.toString(i)
       | Pop => "pop"
       | Swap => "swap"
-      | IfZero(target) => "if_zero " ++ target
+      | IfZero(target) => "if_zero " ++ target.name
       | Exit => "exit"
-      | Call(name, args) => "call/" ++ args->Belt.Int.toString ++ " " ++ name
+      | Call(fn, args) => "call/" ++ args->Belt.Int.toString ++ " " ++ fn.name
       | Ret(n) => "ret " ++ n->Belt.Int.toString
-      | Goto(label) => "goto " ++ label
-      | Label(label) => label ++ ":"
+      | Goto(label) => "goto " ++ label.name
+      | Label(label) => label.name ++ ":"
       | Sub => "sub"
       | Le => "le"
       }
