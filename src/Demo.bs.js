@@ -2,7 +2,10 @@
 
 import * as Fs from "fs";
 import * as List from "rescript/lib/es6/list.js";
+import * as Process from "process";
 import * as Belt_List from "rescript/lib/es6/belt_List.js";
+
+var is_linux = "linux" === Process.platform;
 
 function findIndex(list, item) {
   var _list = list;
@@ -57,7 +60,7 @@ function vadd(a, b) {
           RE_EXN_ID: "Assert_failure",
           _1: [
             "Demo.res",
-            40,
+            42,
             11
           ],
           Error: new Error()
@@ -67,7 +70,7 @@ function vadd(a, b) {
         RE_EXN_ID: "Assert_failure",
         _1: [
           "Demo.res",
-          40,
+          42,
           11
         ],
         Error: new Error()
@@ -86,7 +89,7 @@ function vmul(a, b) {
           RE_EXN_ID: "Assert_failure",
           _1: [
             "Demo.res",
-            47,
+            49,
             11
           ],
           Error: new Error()
@@ -96,7 +99,7 @@ function vmul(a, b) {
         RE_EXN_ID: "Assert_failure",
         _1: [
           "Demo.res",
-          47,
+          49,
           11
         ],
         Error: new Error()
@@ -520,7 +523,7 @@ function preprocess(expr) {
                 RE_EXN_ID: "Assert_failure",
                 _1: [
                   "Demo.res",
-                  356,
+                  358,
                   20
                 ],
                 Error: new Error()
@@ -1007,7 +1010,7 @@ function compile_indexed(expr) {
               RE_EXN_ID: "Match_failure",
               _1: [
                 "Demo.res",
-                508,
+                510,
                 4
               ],
               Error: new Error()
@@ -1548,7 +1551,9 @@ function print$3(instrs) {
                 return "ret " + String(instr._0);
             case /* Label */11 :
                 var label = instr._0;
-                var props = label.ty === /* Function */1 ? ".def " + get_label(label) + ";\n.scl 2;\n.type 32;\n.endef\n" : "";
+                var props = label.ty === /* Function */1 ? (
+                    is_linux ? ".type " + get_label(label) + ",@function\n.global " + get_label(label) + "\n" : ".def " + get_label(label) + ";\n.scl 2;\n.type 32;\n.endef\n"
+                  ) : "";
                 return props + get_label(label) + ":";
             case /* Call */12 :
                 return "call " + get_label(instr._0);
@@ -1675,6 +1680,7 @@ console.log("==> native ir:");
 Fs.writeFileSync("machine_code.s", print$3(assembly), "utf8");
 
 export {
+  is_linux ,
   findIndex ,
   to_little_endian_32 ,
   Ast ,
@@ -1688,4 +1694,4 @@ export {
   bytecode ,
   assembly ,
 }
-/* ident_main Not a pure module */
+/* is_linux Not a pure module */

@@ -1,3 +1,5 @@
+let is_linux = "linux" == Node.Process.process["platform"]
+
 let findIndex = (list: list<'a>, item: 'a) => {
   let rec findWithIndex = (list: list<'a>, index: int) => {
     switch list {
@@ -653,7 +655,11 @@ module Native = {
       | Setna(reg) => "setna " ++ to_reg_str(reg)
       | Label(label) => {
           let props = if label.ty === Resolve.Function {
-            ".def " ++ get_label(label) ++ ";\n.scl 2;\n.type 32;\n.endef\n"
+            if is_linux {
+              ".type " ++ get_label(label) ++ ",@function\n.global " ++ get_label(label) ++ "\n"
+            } else {
+              ".def " ++ get_label(label) ++ ";\n.scl 2;\n.type 32;\n.endef\n"
+            }
           } else {
             ""
           }

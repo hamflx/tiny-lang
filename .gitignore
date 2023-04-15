@@ -5,6 +5,7 @@
 .merlin
 
 /machine_code.*
+/libmachine_code.*
 /test.o
 /bytecode.bin
 
