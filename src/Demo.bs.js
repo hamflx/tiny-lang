@@ -1085,24 +1085,51 @@ function compile_vm(instrs) {
         case /* Add */0 :
             return {
                     hd: {
-                      TAG: /* Pop */2,
-                      _0: /* Rax */0
+                      TAG: /* Pop */3,
+                      _0: /* Rax */1
                     },
                     tl: {
                       hd: {
-                        TAG: /* Pop */2,
-                        _0: /* Rbx */1
+                        TAG: /* Pop */3,
+                        _0: /* Rbx */2
                       },
                       tl: {
                         hd: {
-                          TAG: /* Add */3,
-                          _0: /* Rax */0,
-                          _1: /* Rbx */1
+                          TAG: /* Add */4,
+                          _0: /* Rax */1,
+                          _1: /* Rbx */2
                         },
                         tl: {
                           hd: {
-                            TAG: /* Push */1,
-                            _0: /* Rax */0
+                            TAG: /* Push */2,
+                            _0: /* Rax */1
+                          },
+                          tl: /* [] */0
+                        }
+                      }
+                    }
+                  };
+        case /* Sub */1 :
+            return {
+                    hd: {
+                      TAG: /* Pop */3,
+                      _0: /* Rbx */2
+                    },
+                    tl: {
+                      hd: {
+                        TAG: /* Pop */3,
+                        _0: /* Rax */1
+                      },
+                      tl: {
+                        hd: {
+                          TAG: /* Sub */5,
+                          _0: /* Rax */1,
+                          _1: /* Rbx */2
+                        },
+                        tl: {
+                          hd: {
+                            TAG: /* Push */2,
+                            _0: /* Rax */1
                           },
                           tl: /* [] */0
                         }
@@ -1112,23 +1139,23 @@ function compile_vm(instrs) {
         case /* Mul */2 :
             return {
                     hd: {
-                      TAG: /* Pop */2,
-                      _0: /* Rax */0
+                      TAG: /* Pop */3,
+                      _0: /* Rax */1
                     },
                     tl: {
                       hd: {
-                        TAG: /* Pop */2,
-                        _0: /* Rbx */1
+                        TAG: /* Pop */3,
+                        _0: /* Rbx */2
                       },
                       tl: {
                         hd: {
-                          TAG: /* Mul */4,
-                          _0: /* Rbx */1
+                          TAG: /* Mul */6,
+                          _0: /* Rbx */2
                         },
                         tl: {
                           hd: {
-                            TAG: /* Push */1,
-                            _0: /* Rax */0
+                            TAG: /* Push */2,
+                            _0: /* Rax */1
                           },
                           tl: /* [] */0
                         }
@@ -1138,47 +1165,83 @@ function compile_vm(instrs) {
         case /* Pop */3 :
             return {
                     hd: {
-                      TAG: /* Pop */2,
-                      _0: /* Rax */0
+                      TAG: /* Pop */3,
+                      _0: /* Rax */1
                     },
                     tl: /* [] */0
                   };
         case /* Swap */4 :
             return {
                     hd: {
-                      TAG: /* Pop */2,
-                      _0: /* Rax */0
+                      TAG: /* Pop */3,
+                      _0: /* Rax */1
                     },
                     tl: {
                       hd: {
-                        TAG: /* Pop */2,
-                        _0: /* Rbx */1
+                        TAG: /* Pop */3,
+                        _0: /* Rbx */2
                       },
                       tl: {
                         hd: {
-                          TAG: /* Push */1,
-                          _0: /* Rax */0
+                          TAG: /* Push */2,
+                          _0: /* Rax */1
                         },
                         tl: {
                           hd: {
-                            TAG: /* Push */1,
-                            _0: /* Rbx */1
+                            TAG: /* Push */2,
+                            _0: /* Rbx */2
                           },
                           tl: /* [] */0
                         }
                       }
                     }
                   };
-        default:
-          throw {
-                RE_EXN_ID: "Match_failure",
-                _1: [
-                  "Demo.res",
-                  535,
-                  6
-                ],
-                Error: new Error()
-              };
+        case /* Le */5 :
+            return {
+                    hd: {
+                      TAG: /* Pop */3,
+                      _0: /* Rbx */2
+                    },
+                    tl: {
+                      hd: {
+                        TAG: /* Pop */3,
+                        _0: /* Rax */1
+                      },
+                      tl: {
+                        hd: {
+                          TAG: /* Cmp */8,
+                          _0: /* Rax */1,
+                          _1: /* Rbx */2
+                        },
+                        tl: {
+                          hd: {
+                            TAG: /* Setna */9,
+                            _0: /* Al */0
+                          },
+                          tl: {
+                            hd: {
+                              TAG: /* Movzbq */1,
+                              _0: /* Rbx */2,
+                              _1: /* Al */0
+                            },
+                            tl: {
+                              hd: {
+                                TAG: /* Push */2,
+                                _0: /* Rbx */2
+                              },
+                              tl: /* [] */0
+                            }
+                          }
+                        }
+                      }
+                    }
+                  };
+        case /* Exit */6 :
+            return {
+                    hd: /* Ret */0,
+                    tl: /* [] */0
+                  };
+        
       }
     } else {
       switch (instr.TAG | 0) {
@@ -1186,7 +1249,7 @@ function compile_vm(instrs) {
             return {
                     hd: {
                       TAG: /* Mov */0,
-                      _0: /* Rax */0,
+                      _0: /* Rax */1,
                       _1: {
                         TAG: /* Constant */0,
                         _0: instr._0
@@ -1194,8 +1257,8 @@ function compile_vm(instrs) {
                     },
                     tl: {
                       hd: {
-                        TAG: /* Push */1,
-                        _0: /* Rax */0
+                        TAG: /* Push */2,
+                        _0: /* Rax */1
                       },
                       tl: /* [] */0
                     }
@@ -1204,7 +1267,7 @@ function compile_vm(instrs) {
             return {
                     hd: {
                       TAG: /* Mov */0,
-                      _0: /* Rbx */1,
+                      _0: /* Rbx */2,
                       _1: {
                         TAG: /* Constant */0,
                         _0: instr._0
@@ -1213,34 +1276,86 @@ function compile_vm(instrs) {
                     tl: {
                       hd: {
                         TAG: /* Mov */0,
-                        _0: /* Rax */0,
+                        _0: /* Rax */1,
                         _1: {
                           TAG: /* RegOffset */3,
-                          base: /* Rsp */4,
-                          index: /* Rbx */1,
+                          base: /* Rsp */5,
+                          index: /* Rbx */2,
                           scale: 8,
                           disp: 0
                         }
                       },
                       tl: {
                         hd: {
-                          TAG: /* Push */1,
-                          _0: /* Rax */0
+                          TAG: /* Push */2,
+                          _0: /* Rax */1
                         },
                         tl: /* [] */0
                       }
                     }
                   };
-        default:
-          throw {
-                RE_EXN_ID: "Match_failure",
-                _1: [
-                  "Demo.res",
-                  535,
-                  6
-                ],
-                Error: new Error()
-              };
+        case /* Call */2 :
+            return {
+                    hd: {
+                      TAG: /* Call */12,
+                      _0: instr._0
+                    },
+                    tl: /* [] */0
+                  };
+        case /* Ret */3 :
+            var n = instr._0;
+            if (n !== 0) {
+              return {
+                      hd: {
+                        TAG: /* Retn */10,
+                        _0: n
+                      },
+                      tl: /* [] */0
+                    };
+            } else {
+              return {
+                      hd: /* Ret */0,
+                      tl: /* [] */0
+                    };
+            }
+        case /* IfZero */4 :
+            return {
+                    hd: {
+                      TAG: /* Pop */3,
+                      _0: /* Rax */1
+                    },
+                    tl: {
+                      hd: {
+                        TAG: /* Test */7,
+                        _0: /* Rax */1,
+                        _1: /* Rax */1
+                      },
+                      tl: {
+                        hd: {
+                          TAG: /* Je */14,
+                          _0: instr._0
+                        },
+                        tl: /* [] */0
+                      }
+                    }
+                  };
+        case /* Goto */5 :
+            return {
+                    hd: {
+                      TAG: /* Goto */13,
+                      _0: instr._0
+                    },
+                    tl: /* [] */0
+                  };
+        case /* Label */6 :
+            return {
+                    hd: {
+                      TAG: /* Label */11,
+                      _0: instr._0
+                    },
+                    tl: /* [] */0
+                  };
+        
       }
     }
   };
@@ -1254,18 +1369,18 @@ function compile_vm(instrs) {
       if (match && match.hd === 3) {
         return {
                 hd: {
-                  TAG: /* Pop */2,
-                  _0: /* Rax */0
+                  TAG: /* Pop */3,
+                  _0: /* Rax */1
                 },
                 tl: {
                   hd: {
-                    TAG: /* Pop */2,
-                    _0: /* Rbx */1
+                    TAG: /* Pop */3,
+                    _0: /* Rbx */2
                   },
                   tl: {
                     hd: {
-                      TAG: /* Push */1,
-                      _0: /* Rax */0
+                      TAG: /* Push */2,
+                      _0: /* Rax */1
                     },
                     tl: compile_inner(match.tl)
                   }
@@ -1283,8 +1398,8 @@ function compile_vm(instrs) {
               compile_inner(instrs),
               {
                 hd: {
-                  TAG: /* Pop */2,
-                  _0: /* Rax */0
+                  TAG: /* Pop */3,
+                  _0: /* Rax */1
                 },
                 tl: {
                   hd: /* Ret */0,
@@ -1302,11 +1417,11 @@ function optimize(instrs) {
         return /* [] */0;
       }
       var head = instrs.hd;
-      if (typeof head !== "number" && head.TAG === /* Push */1 && head._0 === 0) {
+      if (typeof head !== "number" && head.TAG === /* Push */2 && head._0 === 1) {
         var match = instrs.tl;
         if (match) {
           var match$1 = match.hd;
-          if (typeof match$1 !== "number" && match$1.TAG === /* Pop */2 && match$1._0 === 0) {
+          if (typeof match$1 !== "number" && match$1.TAG === /* Pop */3 && match$1._0 === 1) {
             _instrs = match.tl;
             continue ;
           }
@@ -1332,277 +1447,19 @@ function optimize(instrs) {
   };
 }
 
-function generate(instrs) {
-  var generate_instr = function (instr) {
-    if (typeof instr === "number") {
-      return {
-              hd: 195,
-              tl: /* [] */0
-            };
-    }
-    switch (instr.TAG | 0) {
-      case /* Mov */0 :
-          var i = instr._1;
-          var reg = instr._0;
-          switch (i.TAG | 0) {
-            case /* Constant */0 :
-                var i$1 = i._0;
-                if (i$1 < 2147483647) {
-                  var tmp;
-                  switch (reg) {
-                    case /* Rax */0 :
-                        tmp = 192;
-                        break;
-                    case /* Rbx */1 :
-                        tmp = 195;
-                        break;
-                    case /* Rcx */2 :
-                        tmp = 193;
-                        break;
-                    case /* Rdx */3 :
-                        tmp = 194;
-                        break;
-                    case /* Rsp */4 :
-                        throw {
-                              RE_EXN_ID: "Assert_failure",
-                              _1: [
-                                "Demo.res",
-                                591,
-                                17
-                              ],
-                              Error: new Error()
-                            };
-                    
-                  }
-                  return {
-                          hd: 72,
-                          tl: {
-                            hd: 199,
-                            tl: {
-                              hd: tmp,
-                              tl: to_little_endian_32(i$1)
-                            }
-                          }
-                        };
-                }
-                break;
-            case /* Reg */1 :
-            case /* Addr */2 :
-                break;
-            case /* RegOffset */3 :
-                if (i.scale === 8) {
-                  var disp = i.disp;
-                  if (disp < 128) {
-                    if (i.base >= 4) {
-                      var tmp$1;
-                      switch (reg) {
-                        case /* Rax */0 :
-                            tmp$1 = 68;
-                            break;
-                        case /* Rbx */1 :
-                            tmp$1 = 92;
-                            break;
-                        case /* Rcx */2 :
-                            tmp$1 = 76;
-                            break;
-                        case /* Rdx */3 :
-                            tmp$1 = 84;
-                            break;
-                        case /* Rsp */4 :
-                            throw {
-                                  RE_EXN_ID: "Assert_failure",
-                                  _1: [
-                                    "Demo.res",
-                                    606,
-                                    19
-                                  ],
-                                  Error: new Error()
-                                };
-                        
-                      }
-                      var tmp$2;
-                      switch (i.index) {
-                        case /* Rax */0 :
-                            tmp$2 = 196;
-                            break;
-                        case /* Rbx */1 :
-                            tmp$2 = 220;
-                            break;
-                        case /* Rcx */2 :
-                            tmp$2 = 204;
-                            break;
-                        case /* Rdx */3 :
-                            tmp$2 = 212;
-                            break;
-                        case /* Rsp */4 :
-                            throw {
-                                  RE_EXN_ID: "Assert_failure",
-                                  _1: [
-                                    "Demo.res",
-                                    613,
-                                    19
-                                  ],
-                                  Error: new Error()
-                                };
-                        
-                      }
-                      return {
-                              hd: 72,
-                              tl: {
-                                hd: 139,
-                                tl: {
-                                  hd: tmp$1,
-                                  tl: {
-                                    hd: tmp$2,
-                                    tl: {
-                                      hd: disp,
-                                      tl: /* [] */0
-                                    }
-                                  }
-                                }
-                              }
-                            };
-                    }
-                    throw {
-                          RE_EXN_ID: "Assert_failure",
-                          _1: [
-                            "Demo.res",
-                            617,
-                            15
-                          ],
-                          Error: new Error()
-                        };
-                  }
-                  
-                }
-                break;
-            
-          }
-          break;
-      case /* Push */1 :
-          switch (instr._0) {
-            case /* Rax */0 :
-                return {
-                        hd: 80,
-                        tl: /* [] */0
-                      };
-            case /* Rbx */1 :
-                return {
-                        hd: 83,
-                        tl: /* [] */0
-                      };
-            case /* Rcx */2 :
-                return {
-                        hd: 81,
-                        tl: /* [] */0
-                      };
-            case /* Rdx */3 :
-                return {
-                        hd: 82,
-                        tl: /* [] */0
-                      };
-            case /* Rsp */4 :
-                break;
-            
-          }
-          break;
-      case /* Pop */2 :
-          switch (instr._0) {
-            case /* Rax */0 :
-                return {
-                        hd: 88,
-                        tl: /* [] */0
-                      };
-            case /* Rbx */1 :
-                return {
-                        hd: 91,
-                        tl: /* [] */0
-                      };
-            case /* Rcx */2 :
-                return {
-                        hd: 89,
-                        tl: /* [] */0
-                      };
-            case /* Rdx */3 :
-                return {
-                        hd: 90,
-                        tl: /* [] */0
-                      };
-            case /* Rsp */4 :
-                break;
-            
-          }
-          break;
-      case /* Add */3 :
-          if (instr._0 === 0 && instr._1 === 1) {
-            return {
-                    hd: 72,
-                    tl: {
-                      hd: 1,
-                      tl: {
-                        hd: 216,
-                        tl: /* [] */0
-                      }
-                    }
-                  };
-          }
-          break;
-      case /* Mul */4 :
-          if (instr._0 === 1) {
-            return {
-                    hd: 72,
-                    tl: {
-                      hd: 247,
-                      tl: {
-                        hd: 227,
-                        tl: /* [] */0
-                      }
-                    }
-                  };
-          }
-          break;
-      
-    }
-    throw {
-          RE_EXN_ID: "Assert_failure",
-          _1: [
-            "Demo.res",
-            630,
-            13
-          ],
-          Error: new Error()
-        };
-  };
-  var generate_inner = function (instrs) {
-    if (instrs) {
-      return Belt_List.concatMany([
-                  generate_instr(instrs.hd),
-                  generate_inner(instrs.tl)
-                ]);
-    } else {
-      return /* [] */0;
-    }
-  };
-  return generate_inner(instrs);
-}
-
-function to_hex$1(code) {
-  return Belt_List.reduce(code, "", (function (sum, item) {
-                return sum + ("00" + item.toString(16)).slice(-2);
-              }));
-}
-
 function to_reg_str(reg) {
   switch (reg) {
-    case /* Rax */0 :
+    case /* Al */0 :
+        return "al";
+    case /* Rax */1 :
         return "rax";
-    case /* Rbx */1 :
+    case /* Rbx */2 :
         return "rbx";
-    case /* Rcx */2 :
+    case /* Rcx */3 :
         return "rcx";
-    case /* Rdx */3 :
+    case /* Rdx */4 :
         return "rdx";
-    case /* Rsp */4 :
+    case /* Rsp */5 :
         return "rsp";
     
   }
@@ -1623,40 +1480,55 @@ function to_mov_arg_str(reg) {
 }
 
 function print$3(instrs) {
-  for(var i = 1 ,i_finish = List.length(instrs); i <= i_finish; ++i){
-    var reg = List.nth(instrs, i - 1 | 0);
-    var instr_text;
-    if (typeof reg === "number") {
-      instr_text = "ret";
-    } else {
-      switch (reg.TAG | 0) {
-        case /* Mov */0 :
-            instr_text = "mov " + to_reg_str(reg._0) + ", " + to_mov_arg_str(reg._1);
-            break;
-        case /* Push */1 :
-            instr_text = "push " + to_reg_str(reg._0);
-            break;
-        case /* Pop */2 :
-            instr_text = "pop " + to_reg_str(reg._0);
-            break;
-        case /* Add */3 :
-            instr_text = "add " + to_reg_str(reg._0) + ", " + to_reg_str(reg._1);
-            break;
-        case /* Mul */4 :
-            instr_text = "mul " + to_reg_str(reg._0);
-            break;
-        
-      }
-    }
-    console.log(instr_text);
-  }
+  var get_label = function (label) {
+    return label.name + "_" + String(label.stamp);
+  };
+  var instr_text = Belt_List.map(instrs, (function (instr) {
+          if (typeof instr === "number") {
+            return "ret";
+          }
+          switch (instr.TAG | 0) {
+            case /* Mov */0 :
+                return "movq " + to_reg_str(instr._0) + ", " + to_mov_arg_str(instr._1);
+            case /* Movzbq */1 :
+                return "movzbq " + to_reg_str(instr._0) + ", " + to_reg_str(instr._1);
+            case /* Push */2 :
+                return "pushq " + to_reg_str(instr._0);
+            case /* Pop */3 :
+                return "popq " + to_reg_str(instr._0);
+            case /* Add */4 :
+                return "addq " + to_reg_str(instr._0) + ", " + to_reg_str(instr._1);
+            case /* Sub */5 :
+                return "subq " + to_reg_str(instr._0) + ", " + to_reg_str(instr._1);
+            case /* Mul */6 :
+                return "mulq " + to_reg_str(instr._0);
+            case /* Test */7 :
+                return "testq " + to_reg_str(instr._0) + ", " + to_reg_str(instr._1);
+            case /* Cmp */8 :
+                return "cmpq " + to_reg_str(instr._0) + ", " + to_reg_str(instr._1);
+            case /* Setna */9 :
+                return "setna " + to_reg_str(instr._0);
+            case /* Retn */10 :
+                return "retq " + String(instr._0);
+            case /* Label */11 :
+                return get_label(instr._0) + ":";
+            case /* Call */12 :
+                return "callq " + get_label(instr._0);
+            case /* Goto */13 :
+                return "jmp " + get_label(instr._0);
+            case /* Je */14 :
+                return "je " + get_label(instr._0);
+            
+          }
+        }));
+  return Belt_List.reduce(instr_text, ".intel_syntax noprefix\n", (function (res, ins) {
+                return res + ins + "\n";
+              }));
 }
 
 var Native = {
   compile_vm: compile_vm,
   optimize: optimize,
-  generate: generate,
-  to_hex: to_hex$1,
   to_reg_str: to_reg_str,
   to_mov_arg_str: to_mov_arg_str,
   print: print$3
@@ -1758,6 +1630,12 @@ var bytecode = to_hex(to_bytecode(Belt_List.concatMany([
 
 Fs.writeFileSync("bytecode.bin", bytecode, "hex");
 
+var assembly = optimize(compile_vm(instrs2));
+
+console.log("==> native ir:");
+
+Fs.writeFileSync("machine_code.s", print$3(assembly), "utf8");
+
 export {
   findIndex ,
   to_little_endian_32 ,
@@ -1770,5 +1648,6 @@ export {
   my_expr ,
   instrs2 ,
   bytecode ,
+  assembly ,
 }
 /* ident_main Not a pure module */

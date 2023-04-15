@@ -524,10 +524,27 @@ module Vm = {
 }
 
 module Native = {
-  type reg = Rax | Rbx | Rcx | Rdx | Rsp
+  type reg = Al | Rax | Rbx | Rcx | Rdx | Rsp
   type mov_arg =
     Constant(int) | Reg(reg) | Addr(int) | RegOffset({base: reg, index: reg, scale: int, disp: int})
-  type instr = Mov(reg, mov_arg) | Push(reg) | Pop(reg) | Add(reg, reg) | Mul(reg) | Ret
+  type instr =
+    | Mov(reg, mov_arg)
+    | Movzbq(reg, reg)
+    | Push(reg)
+    | Pop(reg)
+    | Add(reg, reg)
+    | Sub(reg, reg)
+    | Mul(reg)
+    | Test(reg, reg)
+    | Cmp(reg, reg)
+    | Setna(reg)
+    | Retn(int)
+    | Ret
+    | Label(Resolve.ident)
+    | Call(Resolve.ident)
+    | Goto(Resolve.ident)
+    | Je(Resolve.ident)
+
   type instrs = list<instr>
 
   let compile_vm = (instrs: Vm.instrs): instrs => {
@@ -535,6 +552,8 @@ module Native = {
       switch instr {
       | Vm.Cst(i) => list{Mov(Rax, Constant(i)), Push(Rax)}
       | Vm.Add => list{Pop(Rax), Pop(Rbx), Add(Rax, Rbx), Push(Rax)}
+      | Vm.Sub => list{Pop(Rbx), Pop(Rax), Sub(Rax, Rbx), Push(Rax)}
+      | Vm.Le => list{Pop(Rbx), Pop(Rax), Cmp(Rax, Rbx), Setna(Al), Movzbq(Rbx, Al), Push(Rbx)}
       | Vm.Mul => list{Pop(Rax), Pop(Rbx), Mul(Rbx), Push(Rax)}
       | Vm.Var(i) =>
         list{
@@ -544,6 +563,13 @@ module Native = {
         }
       | Vm.Pop => list{Pop(Rax)}
       | Vm.Swap => list{Pop(Rax), Pop(Rbx), Push(Rax), Push(Rbx)}
+      | Ret(0) => list{Ret}
+      | Ret(n) => list{Retn(n)}
+      | Exit => list{Ret}
+      | Call(label, _) => list{Call(label)}
+      | Goto(label) => list{Goto(label)}
+      | IfZero(label) => list{Pop(Rax), Test(Rax, Rax), Je(label)}
+      | Label(label) => list{Label(label)}
       }
     }
     let rec compile_inner = (instrs: Vm.instrs): instrs => {
@@ -576,77 +602,9 @@ module Native = {
     optimize_rec(instrs)
   }
 
-  let generate = (instrs: instrs) => {
-    let generate_instr = (instr: instr) => {
-      switch instr {
-      | Mov(reg, Constant(i)) if i < 0x7fffffff =>
-        list{
-          0x48,
-          0xc7,
-          switch reg {
-          | Rax => 0xc0
-          | Rbx => 0xc3
-          | Rcx => 0xc1
-          | Rdx => 0xc2
-          | _ => assert false
-          },
-          ...to_little_endian_32(i),
-        }
-      | Mov(target, RegOffset({base, index, scale: 8, disp})) if disp < 0x80 =>
-        switch (base, index) {
-        | (Rsp, index) =>
-          list{
-            0x48,
-            0x8b,
-            switch target {
-            | Rax => 0x44
-            | Rbx => 0x5c
-            | Rcx => 0x4c
-            | Rdx => 0x54
-            | _ => assert false
-            },
-            switch index {
-            | Rax => 0xc4
-            | Rbx => 0xdc
-            | Rcx => 0xcc
-            | Rdx => 0xd4
-            | _ => assert false
-            },
-            disp,
-          }
-        | _ => assert false
-        }
-      | Push(Rax) => list{0x50}
-      | Push(Rbx) => list{0x53}
-      | Push(Rcx) => list{0x51}
-      | Push(Rdx) => list{0x52}
-      | Pop(Rax) => list{0x58}
-      | Pop(Rbx) => list{0x5b}
-      | Pop(Rcx) => list{0x59}
-      | Pop(Rdx) => list{0x5a}
-      | Add(Rax, Rbx) => list{0x48, 0x01, 0xd8}
-      | Mul(Rbx) => list{0x48, 0xf7, 0xe3}
-      | Ret => list{0xc3}
-      | _ => assert false
-      }
-    }
-    let rec generate_inner = (instrs: instrs) => {
-      switch instrs {
-      | list{} => list{}
-      | list{head, ...tail} => list{...generate_instr(head), ...generate_inner(tail)}
-      }
-    }
-    generate_inner(instrs)
-  }
-
-  let to_hex = (code: list<int>) => {
-    code->Belt.List.reduce("", (sum, item) =>
-      sum ++ ("00" ++ Js.Int.toStringWithRadix(item, ~radix=16))->Js.String2.sliceToEnd(~from=-2)
-    )
-  }
-
   let to_reg_str = (reg: reg) => {
     switch reg {
+    | Al => "al"
     | Rax => "rax"
     | Rbx => "rbx"
     | Rcx => "rcx"
@@ -673,17 +631,30 @@ module Native = {
   }
 
   let print = (instrs: instrs) => {
-    for i in 1 to List.length(instrs) {
-      let instr_text = switch List.nth(instrs, i - 1) {
-      | Mov(reg, arg) => "mov " ++ to_reg_str(reg) ++ ", " ++ to_mov_arg_str(arg)
-      | Push(reg) => "push " ++ to_reg_str(reg)
-      | Pop(reg) => "pop " ++ to_reg_str(reg)
-      | Add(r1, r2) => "add " ++ to_reg_str(r1) ++ ", " ++ to_reg_str(r2)
-      | Mul(reg) => "mul " ++ to_reg_str(reg)
-      | Ret => "ret"
-      }
-      Js.log(instr_text)
+    let get_label = (label: Resolve.ident) => {
+      label.name ++ "_" ++ label.stamp->Belt.Int.toString
     }
+    let instr_text = instrs->Belt.List.map(instr =>
+      switch instr {
+      | Setna(reg) => "setna " ++ to_reg_str(reg)
+      | Label(label) => get_label(label) ++ ":"
+      | Mov(reg, arg) => "movq " ++ to_reg_str(reg) ++ ", " ++ to_mov_arg_str(arg)
+      | Movzbq(r1, r2) => "movzbq " ++ to_reg_str(r1) ++ ", " ++ to_reg_str(r2)
+      | Push(reg) => "pushq " ++ to_reg_str(reg)
+      | Pop(reg) => "popq " ++ to_reg_str(reg)
+      | Add(r1, r2) => "addq " ++ to_reg_str(r1) ++ ", " ++ to_reg_str(r2)
+      | Sub(r1, r2) => "subq " ++ to_reg_str(r1) ++ ", " ++ to_reg_str(r2)
+      | Mul(reg) => "mulq " ++ to_reg_str(reg)
+      | Cmp(r1, r2) => "cmpq " ++ to_reg_str(r1) ++ ", " ++ to_reg_str(r2)
+      | Test(r1, r2) => "testq " ++ to_reg_str(r1) ++ ", " ++ to_reg_str(r2)
+      | Call(label) => "callq " ++ get_label(label)
+      | Goto(label) => "jmp " ++ get_label(label)
+      | Je(label) => "je " ++ get_label(label)
+      | Ret => "ret"
+      | Retn(n) => "retq " ++ n->Belt.Int.toString
+      }
+    )
+    instr_text->Belt.List.reduce(".intel_syntax noprefix\n", (res, ins) => res ++ ins ++ "\n")
   }
 }
 
@@ -760,9 +731,9 @@ let bytecode = Vm.to_hex(Vm.to_bytecode(list{...instrs2, Vm.Exit}))
 Node.Fs.writeFileSync("bytecode.bin", bytecode, #hex)
 
 // machine code
-// let assembly = Native.optimize(Native.compile_vm(instrs2))
-// Js.log("==> native ir:")
-// Native.print(assembly)
+let assembly = Native.optimize(Native.compile_vm(instrs2))
+Js.log("==> native ir:")
+Node.Fs.writeFileSync("machine_code.s", Native.print(assembly), #utf8)
 
 // Js.log("==> machine code:")
 // let machine_code = Native.to_hex(Native.generate(assembly))
