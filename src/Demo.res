@@ -20,11 +20,14 @@ module Ast = {
   type rec expr =
     | Cst(int)
     | Add(expr, expr)
+    | Sub(expr, expr)
     | Mul(expr, expr)
     | Var(string)
     | Let(string, expr, expr)
     | Fn(list<string>, expr)
     | App(string, list<expr>)
+    | Le(expr, expr)
+    | If(expr, expr, expr)
 
   type rec value =
     | Vint(int)
@@ -186,13 +189,15 @@ module Vm = {
   type instr =
     | Cst(int)
     | Add
+    | Sub
     | Mul
     | Var(int)
     | Pop
     | Swap
     | Call(string, int)
     | Ret(int)
-    | IfZero
+    | Le
+    | IfZero(string)
     | Goto(string)
     | Exit
     | Label(string)
@@ -211,6 +216,8 @@ module Vm = {
   let instr_goto = 8
   let instr_if_zero = 9
   let instr_exit = 10
+  let instr_sub = 11
+  let instr_le = 12
 
   type sv = Slocal(string) | Stmp
   type senv = list<sv>
@@ -218,10 +225,13 @@ module Vm = {
   type rec expr =
     | Cst(int)
     | Add(expr, expr)
+    | Sub(expr, expr)
     | Mul(expr, expr)
     | Var(string)
     | Let(string, expr, expr)
     | App(string, list<expr>)
+    | Le(expr, expr)
+    | If(expr, expr, expr)
 
   let find_local_index = (env: senv, name: string) => {
     let rec find_recursive = (env: senv, stack_index: int) => {
@@ -247,6 +257,11 @@ module Vm = {
           let (b_expr, b_fns) = preprocess_rec(b)
           (Add(a_expr, b_expr), list{...a_fns, ...b_fns})
         }
+      | Sub(a, b) => {
+          let (a_expr, a_fns) = preprocess_rec(a)
+          let (b_expr, b_fns) = preprocess_rec(b)
+          (Sub(a_expr, b_expr), list{...a_fns, ...b_fns})
+        }
       | Mul(a, b) => {
           let (a_expr, a_fns) = preprocess_rec(a)
           let (b_expr, b_fns) = preprocess_rec(b)
@@ -270,6 +285,17 @@ module Vm = {
           (App(name, args), fns)
         }
       | Fn(_, _) => assert false
+      | Le(a, b) => {
+          let (a_expr, a_fns) = preprocess_rec(a)
+          let (b_expr, b_fns) = preprocess_rec(b)
+          (Le(a_expr, b_expr), list{...a_fns, ...b_fns})
+        }
+      | If(a, b, c) => {
+          let (a_expr, a_fns) = preprocess_rec(a)
+          let (b_expr, b_fns) = preprocess_rec(b)
+          let (c_expr, c_fns) = preprocess_rec(c)
+          (If(a_expr, b_expr, c_expr), list{...a_fns, ...b_fns, ...c_fns})
+        }
       }
     }
     let (main, fns) = preprocess_rec(expr)
@@ -277,30 +303,72 @@ module Vm = {
   }
 
   let compile_expr = (expr: expr, env: senv): instrs => {
-    let rec compile_inner = (expr: expr, env: senv): instrs => {
+    let rec compile_inner = (expr: expr, env: senv, if_label: int): instrs => {
       switch expr {
       | Cst(i) => list{Cst(i)}
       | Add(e1, e2) =>
-        list{...compile_inner(e1, env), ...compile_inner(e2, list{Stmp, ...env}), Add}
+        list{
+          ...compile_inner(e1, env, if_label + 1),
+          ...compile_inner(e2, list{Stmp, ...env}, if_label + 2),
+          Add,
+        }
+      | Sub(e1, e2) =>
+        list{
+          ...compile_inner(e1, env, if_label + 1),
+          ...compile_inner(e2, list{Stmp, ...env}, if_label + 2),
+          Sub,
+        }
       | Mul(e1, e2) =>
-        list{...compile_inner(e1, env), ...compile_inner(e2, list{Stmp, ...env}), Mul}
+        list{
+          ...compile_inner(e1, env, if_label + 1),
+          ...compile_inner(e2, list{Stmp, ...env}, if_label + 2),
+          Mul,
+        }
       | Var(name) => list{Var(find_local_index(env, name))}
       | Let(name, e1, e2) =>
-        list{...compile_inner(e1, env), ...compile_inner(e2, list{Slocal(name), ...env}), Swap, Pop}
+        list{
+          ...compile_inner(e1, env, if_label + 1),
+          ...compile_inner(e2, list{Slocal(name), ...env}, if_label + 2),
+          Swap,
+          Pop,
+        }
       | App(name, args) => {
-          let (args_instrs, _) = args->Belt.List.reduce((list{}, env), ((args, env), arg) => {
-            (list{...args, ...compile_inner(arg, env)}, list{Stmp, ...env})
+          let (args_instrs, _) = args->Belt.List.reduceWithIndex((list{}, env), (
+            (args, env),
+            arg,
+            i,
+          ) => {
+            (list{...args, ...compile_inner(arg, env, if_label + 1 + i)}, list{Stmp, ...env})
           })
           list{...args_instrs, Call(name, args->Belt.List.length)}
         }
+      | Le(a, b) =>
+        list{
+          ...compile_inner(a, env, if_label + 1),
+          ...compile_inner(b, list{Stmp, ...env}, if_label + 2),
+          Le,
+        }
+      | If(cond, pos_expr, neg_expr) => {
+          let false_label = "false_" ++ if_label->Belt.Int.toString
+          let end_of_if = "end_of_if_" ++ if_label->Belt.Int.toString
+          list{
+            ...compile_inner(cond, env, if_label + 1),
+            IfZero(false_label),
+            ...compile_inner(pos_expr, env, if_label + 2),
+            Goto(end_of_if),
+            Label(false_label),
+            ...compile_inner(neg_expr, env, if_label + 3),
+            Label(end_of_if),
+          }
+        }
       }
     }
-    compile_inner(expr, env)
+    compile_inner(expr, env, 0)
   }
 
   let compile_fun = (fun: fun): instrs => {
     let (name, params, body) = fun
-    let stack = params->Belt.List.map(name => Slocal(name))
+    let stack = params->Belt.List.map(name => Slocal(name))->Belt.List.reverse
     list{Label(name), ...compile_expr(body, list{Stmp, ...stack}), Ret(params->Belt.List.length)}
   }
 
@@ -312,8 +380,8 @@ module Vm = {
   let get_instr_size = (instr: instr) => {
     switch instr {
     | Label(_) => 0
-    | Cst(_) | Var(_) | Ret(_) | Goto(_) => 2
-    | Add | Mul | Pop | Swap | IfZero | Exit => 1
+    | Cst(_) | Var(_) | Ret(_) | Goto(_) | IfZero(_) => 2
+    | Add | Sub | Mul | Le | Pop | Swap | Exit => 1
     | Call(_, _) => 3
     }
   }
@@ -341,13 +409,15 @@ module Vm = {
       | Label(_) => list{}
       | Cst(i) => list{instr_const, i}
       | Add => list{instr_add}
+      | Sub => list{instr_sub}
       | Mul => list{instr_mul}
+      | Le => list{instr_le}
       | Var(i) => list{instr_var, i}
       | Pop => list{instr_pop}
       | Swap => list{instr_swap}
       | Call(target, args) => list{instr_call, target->List.assoc(label_map), args}
       | Ret(args) => list{instr_ret, args}
-      | IfZero => list{instr_if_zero}
+      | IfZero(target) => list{instr_if_zero, target->List.assoc(label_map)}
       | Goto(target) => list{instr_goto, target->List.assoc(label_map)}
       | Exit => list{instr_exit}
       }
@@ -383,12 +453,14 @@ module Vm = {
       | Var(i) => "var " ++ Belt.Int.toString(i)
       | Pop => "pop"
       | Swap => "swap"
-      | IfZero => "if_zero"
+      | IfZero(target) => "if_zero " ++ target
       | Exit => "exit"
       | Call(name, args) => "call/" ++ args->Belt.Int.toString ++ " " ++ name
       | Ret(n) => "ret " ++ n->Belt.Int.toString
       | Goto(label) => "goto " ++ label
       | Label(label) => label ++ ":"
+      | Sub => "sub"
+      | Le => "le"
       }
       Js.log(instr_text)
     }
@@ -583,10 +655,28 @@ module Native = {
 //   ),
 // )
 
+// fib(n)
+// n==0 => n
+// n==1 => n
+// n => fib(n-1) + fib(n-2)
+
+// n<=1
+// n-1<=0
+
 let my_expr = Ast.Let(
-  "add",
-  Ast.Fn(list{"a", "b"}, Ast.Add(Var("a"), Var("b"))),
-  Ast.App("add", list{Ast.Cst(1), Ast.Cst(2)}),
+  "fib",
+  Ast.Fn(
+    list{"n"},
+    Ast.If(
+      Ast.Le(Var("n"), Ast.Cst(1)),
+      Cst(1),
+      Ast.Add(
+        Ast.App("fib", list{Ast.Sub(Ast.Var("n"), Ast.Cst(1))}),
+        Ast.App("fib", list{Ast.Sub(Ast.Var("n"), Ast.Cst(2))}),
+      ),
+    ),
+  ),
+  Ast.App("fib", list{Ast.Cst(10)}),
 )
 
 // let my_nameless = Nameless.compile(my_expr)

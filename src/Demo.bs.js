@@ -57,7 +57,7 @@ function vadd(a, b) {
           RE_EXN_ID: "Assert_failure",
           _1: [
             "Demo.res",
-            37,
+            40,
             11
           ],
           Error: new Error()
@@ -67,7 +67,7 @@ function vadd(a, b) {
         RE_EXN_ID: "Assert_failure",
         _1: [
           "Demo.res",
-          37,
+          40,
           11
         ],
         Error: new Error()
@@ -86,7 +86,7 @@ function vmul(a, b) {
           RE_EXN_ID: "Assert_failure",
           _1: [
             "Demo.res",
-            44,
+            47,
             11
           ],
           Error: new Error()
@@ -96,7 +96,7 @@ function vmul(a, b) {
         RE_EXN_ID: "Assert_failure",
         _1: [
           "Demo.res",
-          44,
+          47,
           11
         ],
         Error: new Error()
@@ -313,12 +313,12 @@ function preprocess(expr) {
                         match$1[1]
                       ])
                 ];
-      case /* Mul */2 :
+      case /* Sub */2 :
           var match$2 = preprocess_rec(expr._0);
           var match$3 = preprocess_rec(expr._1);
           return [
                   {
-                    TAG: /* Mul */2,
+                    TAG: /* Sub */2,
                     _0: match$2[0],
                     _1: match$3[0]
                   },
@@ -327,61 +327,75 @@ function preprocess(expr) {
                         match$3[1]
                       ])
                 ];
-      case /* Var */3 :
+      case /* Mul */3 :
+          var match$4 = preprocess_rec(expr._0);
+          var match$5 = preprocess_rec(expr._1);
           return [
                   {
-                    TAG: /* Var */3,
+                    TAG: /* Mul */3,
+                    _0: match$4[0],
+                    _1: match$5[0]
+                  },
+                  Belt_List.concatMany([
+                        match$4[1],
+                        match$5[1]
+                      ])
+                ];
+      case /* Var */4 :
+          return [
+                  {
+                    TAG: /* Var */4,
                     _0: expr._0
                   },
                   /* [] */0
                 ];
-      case /* Let */4 :
+      case /* Let */5 :
           var v1 = expr._1;
           var binding = expr._0;
-          if (v1.TAG === /* Fn */5) {
-            var match$4 = preprocess_rec(expr._2);
-            var match$5 = preprocess_rec(v1._1);
+          if (v1.TAG === /* Fn */6) {
+            var match$6 = preprocess_rec(expr._2);
+            var match$7 = preprocess_rec(v1._1);
             return [
-                    match$4[0],
+                    match$6[0],
                     Belt_List.concatMany([
                           {
                             hd: [
                               binding,
                               v1._0,
-                              match$5[0]
+                              match$7[0]
                             ],
-                            tl: match$5[1]
+                            tl: match$7[1]
                           },
-                          match$4[1]
+                          match$6[1]
                         ])
                   ];
           }
-          var match$6 = preprocess_rec(v1);
-          var match$7 = preprocess_rec(expr._2);
+          var match$8 = preprocess_rec(v1);
+          var match$9 = preprocess_rec(expr._2);
           return [
                   {
-                    TAG: /* Let */4,
+                    TAG: /* Let */5,
                     _0: binding,
-                    _1: match$6[0],
-                    _2: match$7[0]
+                    _1: match$8[0],
+                    _2: match$9[0]
                   },
                   Belt_List.concatMany([
-                        match$6[1],
-                        match$7[1]
+                        match$8[1],
+                        match$9[1]
                       ])
                 ];
-      case /* Fn */5 :
+      case /* Fn */6 :
           throw {
                 RE_EXN_ID: "Assert_failure",
                 _1: [
                   "Demo.res",
-                  272,
+                  287,
                   20
                 ],
                 Error: new Error()
               };
-      case /* App */6 :
-          var match$8 = Belt_List.reduce(expr._1, [
+      case /* App */7 :
+          var match$10 = Belt_List.reduce(expr._1, [
                 /* [] */0,
                 /* [] */0
               ], (function (param, arg) {
@@ -399,11 +413,42 @@ function preprocess(expr) {
                 }));
           return [
                   {
-                    TAG: /* App */5,
+                    TAG: /* App */6,
                     _0: expr._0,
-                    _1: match$8[0]
+                    _1: match$10[0]
                   },
-                  match$8[1]
+                  match$10[1]
+                ];
+      case /* Le */8 :
+          var match$11 = preprocess_rec(expr._0);
+          var match$12 = preprocess_rec(expr._1);
+          return [
+                  {
+                    TAG: /* Le */7,
+                    _0: match$11[0],
+                    _1: match$12[0]
+                  },
+                  Belt_List.concatMany([
+                        match$11[1],
+                        match$12[1]
+                      ])
+                ];
+      case /* If */9 :
+          var match$13 = preprocess_rec(expr._0);
+          var match$14 = preprocess_rec(expr._1);
+          var match$15 = preprocess_rec(expr._2);
+          return [
+                  {
+                    TAG: /* If */8,
+                    _0: match$13[0],
+                    _1: match$14[0],
+                    _2: match$15[0]
+                  },
+                  Belt_List.concatMany([
+                        match$13[1],
+                        match$14[1],
+                        match$15[1]
+                      ])
                 ];
       
     }
@@ -420,7 +465,7 @@ function preprocess(expr) {
 }
 
 function compile_expr(expr, env) {
-  var compile_inner = function (expr, env) {
+  var compile_inner = function (expr, env, if_label) {
     switch (expr.TAG | 0) {
       case /* Cst */0 :
           return {
@@ -432,29 +477,41 @@ function compile_expr(expr, env) {
                 };
       case /* Add */1 :
           return Belt_List.concatMany([
-                      compile_inner(expr._0, env),
+                      compile_inner(expr._0, env, if_label + 1 | 0),
                       compile_inner(expr._1, {
                             hd: /* Stmp */0,
                             tl: env
-                          }),
+                          }, if_label + 2 | 0),
                       {
                         hd: /* Add */0,
                         tl: /* [] */0
                       }
                     ]);
-      case /* Mul */2 :
+      case /* Sub */2 :
           return Belt_List.concatMany([
-                      compile_inner(expr._0, env),
+                      compile_inner(expr._0, env, if_label + 1 | 0),
                       compile_inner(expr._1, {
                             hd: /* Stmp */0,
                             tl: env
-                          }),
+                          }, if_label + 2 | 0),
                       {
-                        hd: /* Mul */1,
+                        hd: /* Sub */1,
                         tl: /* [] */0
                       }
                     ]);
-      case /* Var */3 :
+      case /* Mul */3 :
+          return Belt_List.concatMany([
+                      compile_inner(expr._0, env, if_label + 1 | 0),
+                      compile_inner(expr._1, {
+                            hd: /* Stmp */0,
+                            tl: env
+                          }, if_label + 2 | 0),
+                      {
+                        hd: /* Mul */2,
+                        tl: /* [] */0
+                      }
+                    ]);
+      case /* Var */4 :
           return {
                   hd: {
                     TAG: /* Var */1,
@@ -462,34 +519,34 @@ function compile_expr(expr, env) {
                   },
                   tl: /* [] */0
                 };
-      case /* Let */4 :
+      case /* Let */5 :
           return Belt_List.concatMany([
-                      compile_inner(expr._1, env),
+                      compile_inner(expr._1, env, if_label + 1 | 0),
                       compile_inner(expr._2, {
                             hd: /* Slocal */{
                               _0: expr._0
                             },
                             tl: env
-                          }),
+                          }, if_label + 2 | 0),
                       {
-                        hd: /* Swap */3,
+                        hd: /* Swap */4,
                         tl: {
-                          hd: /* Pop */2,
+                          hd: /* Pop */3,
                           tl: /* [] */0
                         }
                       }
                     ]);
-      case /* App */5 :
+      case /* App */6 :
           var args = expr._1;
-          var match = Belt_List.reduce(args, [
+          var match = Belt_List.reduceWithIndex(args, [
                 /* [] */0,
                 env
-              ], (function (param, arg) {
+              ], (function (param, arg, i) {
                   var env = param[1];
                   return [
                           Belt_List.concatMany([
                                 param[0],
-                                compile_inner(arg, env)
+                                compile_inner(arg, env, (if_label + 1 | 0) + i | 0)
                               ]),
                           {
                             hd: /* Stmp */0,
@@ -508,23 +565,68 @@ function compile_expr(expr, env) {
                         tl: /* [] */0
                       }
                     ]);
+      case /* Le */7 :
+          return Belt_List.concatMany([
+                      compile_inner(expr._0, env, if_label + 1 | 0),
+                      compile_inner(expr._1, {
+                            hd: /* Stmp */0,
+                            tl: env
+                          }, if_label + 2 | 0),
+                      {
+                        hd: /* Le */5,
+                        tl: /* [] */0
+                      }
+                    ]);
+      case /* If */8 :
+          var false_label = "false_" + String(if_label);
+          var end_of_if = "end_of_if_" + String(if_label);
+          return Belt_List.concatMany([
+                      compile_inner(expr._0, env, if_label + 1 | 0),
+                      {
+                        hd: {
+                          TAG: /* IfZero */4,
+                          _0: false_label
+                        },
+                        tl: compile_inner(expr._1, env, if_label + 2 | 0)
+                      },
+                      {
+                        hd: {
+                          TAG: /* Goto */5,
+                          _0: end_of_if
+                        },
+                        tl: {
+                          hd: {
+                            TAG: /* Label */6,
+                            _0: false_label
+                          },
+                          tl: compile_inner(expr._2, env, if_label + 3 | 0)
+                        }
+                      },
+                      {
+                        hd: {
+                          TAG: /* Label */6,
+                          _0: end_of_if
+                        },
+                        tl: /* [] */0
+                      }
+                    ]);
       
     }
   };
-  return compile_inner(expr, env);
+  return compile_inner(expr, env, 0);
 }
 
 function compile_fun(fun) {
   var params = fun[1];
-  var stack = Belt_List.map(params, (function (name) {
-          return /* Slocal */{
-                  _0: name
-                };
-        }));
+  var stack = Belt_List.reverse(Belt_List.map(params, (function (name) {
+              return /* Slocal */{
+                      _0: name
+                    };
+            })));
   return Belt_List.concatMany([
               {
                 hd: {
-                  TAG: /* Label */5,
+                  TAG: /* Label */6,
                   _0: fun[0]
                 },
                 tl: compile_expr(fun[2], {
@@ -551,7 +653,7 @@ function compile_prog(expr) {
             _1: 0
           },
           tl: {
-            hd: /* Exit */5,
+            hd: /* Exit */6,
             tl: fns
           }
         };
@@ -567,9 +669,10 @@ function get_instr_size(instr) {
     case /* Cst */0 :
     case /* Var */1 :
     case /* Ret */3 :
-    case /* Goto */4 :
+    case /* IfZero */4 :
+    case /* Goto */5 :
         return 2;
-    case /* Label */5 :
+    case /* Label */6 :
         return 0;
     
   }
@@ -590,7 +693,7 @@ function to_bytecode(instrs) {
       ], (function (param, item) {
           var pos = param[1];
           var label_map = param[0];
-          if (typeof item === "number" || item.TAG !== /* Label */5) {
+          if (typeof item === "number" || item.TAG !== /* Label */6) {
             return [
                     label_map,
                     pos + get_instr_size(item) | 0
@@ -617,27 +720,32 @@ function to_bytecode(instrs) {
                     hd: 1,
                     tl: /* [] */0
                   };
-        case /* Mul */1 :
+        case /* Sub */1 :
+            return {
+                    hd: 11,
+                    tl: /* [] */0
+                  };
+        case /* Mul */2 :
             return {
                     hd: 2,
                     tl: /* [] */0
                   };
-        case /* Pop */2 :
+        case /* Pop */3 :
             return {
                     hd: 4,
                     tl: /* [] */0
                   };
-        case /* Swap */3 :
+        case /* Swap */4 :
             return {
                     hd: 5,
                     tl: /* [] */0
                   };
-        case /* IfZero */4 :
+        case /* Le */5 :
             return {
-                    hd: 9,
+                    hd: 12,
                     tl: /* [] */0
                   };
-        case /* Exit */5 :
+        case /* Exit */6 :
             return {
                     hd: 10,
                     tl: /* [] */0
@@ -681,7 +789,15 @@ function to_bytecode(instrs) {
                       tl: /* [] */0
                     }
                   };
-        case /* Goto */4 :
+        case /* IfZero */4 :
+            return {
+                    hd: 9,
+                    tl: {
+                      hd: List.assoc(instr._0, label_map),
+                      tl: /* [] */0
+                    }
+                  };
+        case /* Goto */5 :
             return {
                     hd: 8,
                     tl: {
@@ -689,7 +805,7 @@ function to_bytecode(instrs) {
                       tl: /* [] */0
                     }
                   };
-        case /* Label */5 :
+        case /* Label */6 :
             return /* [] */0;
         
       }
@@ -697,7 +813,7 @@ function to_bytecode(instrs) {
   };
   return Belt_List.reduce(instrs, /* [] */0, (function (code, instr) {
                 var tmp;
-                tmp = typeof instr === "number" || instr.TAG !== /* Label */5 ? compile_instr(instr, label_map) : /* [] */0;
+                tmp = typeof instr === "number" || instr.TAG !== /* Label */6 ? compile_instr(instr, label_map) : /* [] */0;
                 return Belt_List.concatMany([
                             code,
                             tmp
@@ -729,7 +845,7 @@ function compile_indexed(expr) {
                     compile_indexed(expr._0),
                     compile_indexed(expr._1),
                     {
-                      hd: /* Mul */1,
+                      hd: /* Mul */2,
                       tl: /* [] */0
                     }
                   ]);
@@ -746,9 +862,9 @@ function compile_indexed(expr) {
                     compile_indexed(expr._0),
                     compile_indexed(expr._1),
                     {
-                      hd: /* Swap */3,
+                      hd: /* Swap */4,
                       tl: {
-                        hd: /* Pop */2,
+                        hd: /* Pop */3,
                         tl: /* [] */0
                       }
                     }
@@ -759,7 +875,7 @@ function compile_indexed(expr) {
               RE_EXN_ID: "Match_failure",
               _1: [
                 "Demo.res",
-                368,
+                438,
                 4
               ],
               Error: new Error()
@@ -777,19 +893,22 @@ function print$2(instrs) {
         case /* Add */0 :
             instr_text = "add";
             break;
-        case /* Mul */1 :
+        case /* Sub */1 :
+            instr_text = "sub";
+            break;
+        case /* Mul */2 :
             instr_text = "mul";
             break;
-        case /* Pop */2 :
+        case /* Pop */3 :
             instr_text = "pop";
             break;
-        case /* Swap */3 :
+        case /* Swap */4 :
             instr_text = "swap";
             break;
-        case /* IfZero */4 :
-            instr_text = "if_zero";
+        case /* Le */5 :
+            instr_text = "le";
             break;
-        case /* Exit */5 :
+        case /* Exit */6 :
             instr_text = "exit";
             break;
         
@@ -808,10 +927,13 @@ function print$2(instrs) {
         case /* Ret */3 :
             instr_text = "ret " + String(i$1._0);
             break;
-        case /* Goto */4 :
+        case /* IfZero */4 :
+            instr_text = "if_zero " + i$1._0;
+            break;
+        case /* Goto */5 :
             instr_text = "goto " + i$1._0;
             break;
-        case /* Label */5 :
+        case /* Label */6 :
             instr_text = i$1._0 + ":";
             break;
         
@@ -833,6 +955,8 @@ var Vm = {
   instr_goto: 8,
   instr_if_zero: 9,
   instr_exit: 10,
+  instr_sub: 11,
+  instr_le: 12,
   find_local_index: find_local_index$1,
   preprocess: preprocess,
   compile_expr: compile_expr,
@@ -876,7 +1000,7 @@ function compile_vm(instrs) {
                       }
                     }
                   };
-        case /* Mul */1 :
+        case /* Mul */2 :
             return {
                     hd: {
                       TAG: /* Pop */2,
@@ -902,7 +1026,7 @@ function compile_vm(instrs) {
                       }
                     }
                   };
-        case /* Pop */2 :
+        case /* Pop */3 :
             return {
                     hd: {
                       TAG: /* Pop */2,
@@ -910,7 +1034,7 @@ function compile_vm(instrs) {
                     },
                     tl: /* [] */0
                   };
-        case /* Swap */3 :
+        case /* Swap */4 :
             return {
                     hd: {
                       TAG: /* Pop */2,
@@ -941,7 +1065,7 @@ function compile_vm(instrs) {
                 RE_EXN_ID: "Match_failure",
                 _1: [
                   "Demo.res",
-                  407,
+                  479,
                   6
                 ],
                 Error: new Error()
@@ -1003,7 +1127,7 @@ function compile_vm(instrs) {
                 RE_EXN_ID: "Match_failure",
                 _1: [
                   "Demo.res",
-                  407,
+                  479,
                   6
                 ],
                 Error: new Error()
@@ -1016,9 +1140,9 @@ function compile_vm(instrs) {
       return /* [] */0;
     }
     var head = instrs.hd;
-    if (head === 3) {
+    if (head === 4) {
       var match = instrs.tl;
-      if (match && match.hd === 2) {
+      if (match && match.hd === 3) {
         return {
                 hd: {
                   TAG: /* Pop */2,
@@ -1134,7 +1258,7 @@ function generate(instrs) {
                               RE_EXN_ID: "Assert_failure",
                               _1: [
                                 "Demo.res",
-                                463,
+                                535,
                                 17
                               ],
                               Error: new Error()
@@ -1180,7 +1304,7 @@ function generate(instrs) {
                                   RE_EXN_ID: "Assert_failure",
                                   _1: [
                                     "Demo.res",
-                                    478,
+                                    550,
                                     19
                                   ],
                                   Error: new Error()
@@ -1206,7 +1330,7 @@ function generate(instrs) {
                                   RE_EXN_ID: "Assert_failure",
                                   _1: [
                                     "Demo.res",
-                                    485,
+                                    557,
                                     19
                                   ],
                                   Error: new Error()
@@ -1234,7 +1358,7 @@ function generate(instrs) {
                           RE_EXN_ID: "Assert_failure",
                           _1: [
                             "Demo.res",
-                            489,
+                            561,
                             15
                           ],
                           Error: new Error()
@@ -1334,7 +1458,7 @@ function generate(instrs) {
           RE_EXN_ID: "Assert_failure",
           _1: [
             "Demo.res",
-            502,
+            574,
             13
           ],
           Error: new Error()
@@ -1430,44 +1554,81 @@ var Native = {
 };
 
 var my_expr = {
-  TAG: /* Let */4,
-  _0: "add",
+  TAG: /* Let */5,
+  _0: "fib",
   _1: {
-    TAG: /* Fn */5,
+    TAG: /* Fn */6,
     _0: {
-      hd: "a",
-      tl: {
-        hd: "b",
-        tl: /* [] */0
-      }
+      hd: "n",
+      tl: /* [] */0
     },
     _1: {
-      TAG: /* Add */1,
+      TAG: /* If */9,
       _0: {
-        TAG: /* Var */3,
-        _0: "a"
+        TAG: /* Le */8,
+        _0: {
+          TAG: /* Var */4,
+          _0: "n"
+        },
+        _1: {
+          TAG: /* Cst */0,
+          _0: 1
+        }
       },
       _1: {
-        TAG: /* Var */3,
-        _0: "b"
+        TAG: /* Cst */0,
+        _0: 1
+      },
+      _2: {
+        TAG: /* Add */1,
+        _0: {
+          TAG: /* App */7,
+          _0: "fib",
+          _1: {
+            hd: {
+              TAG: /* Sub */2,
+              _0: {
+                TAG: /* Var */4,
+                _0: "n"
+              },
+              _1: {
+                TAG: /* Cst */0,
+                _0: 1
+              }
+            },
+            tl: /* [] */0
+          }
+        },
+        _1: {
+          TAG: /* App */7,
+          _0: "fib",
+          _1: {
+            hd: {
+              TAG: /* Sub */2,
+              _0: {
+                TAG: /* Var */4,
+                _0: "n"
+              },
+              _1: {
+                TAG: /* Cst */0,
+                _0: 2
+              }
+            },
+            tl: /* [] */0
+          }
+        }
       }
     }
   },
   _2: {
-    TAG: /* App */6,
-    _0: "add",
+    TAG: /* App */7,
+    _0: "fib",
     _1: {
       hd: {
         TAG: /* Cst */0,
-        _0: 1
+        _0: 10
       },
-      tl: {
-        hd: {
-          TAG: /* Cst */0,
-          _0: 2
-        },
-        tl: /* [] */0
-      }
+      tl: /* [] */0
     }
   }
 };
@@ -1481,7 +1642,7 @@ print$2(instrs2);
 var bytecode = to_hex(to_bytecode(Belt_List.concatMany([
               instrs2,
               {
-                hd: /* Exit */5,
+                hd: /* Exit */6,
                 tl: /* [] */0
               }
             ])));

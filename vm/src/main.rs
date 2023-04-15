@@ -2,7 +2,9 @@
 enum Instruction {
     Const,
     Add,
+    Sub,
     Mul,
+    Le,
     Var,
     Pop,
     Swap,
@@ -29,6 +31,8 @@ impl TryFrom<u32> for Instruction {
             8 => Ok(Instruction::Goto),
             9 => Ok(Instruction::IfZero),
             10 => Ok(Instruction::Exit),
+            11 => Ok(Instruction::Sub),
+            12 => Ok(Instruction::Le),
             _ => Err("invalid instruction"),
         }
     }
@@ -116,11 +120,34 @@ impl Vm {
                     self.push(ret_value);
                     self.pc = ret_addr;
                 }
-                Instruction::Goto => todo!(),
-                Instruction::IfZero => todo!(),
+                Instruction::Goto => {
+                    let target_addr = self.operand();
+                    self.pc = target_addr;
+                }
+                Instruction::IfZero => {
+                    let else_addr = self.operand();
+                    let value = self.pop();
+                    if value == 0 {
+                        self.pc = else_addr;
+                    } else {
+                        self.pc += 1;
+                    }
+                }
                 Instruction::Exit => {
                     assert_eq!(self.sp, 1);
                     return self.stack[self.sp as usize];
+                }
+                Instruction::Sub => {
+                    let b = self.pop();
+                    let a = self.pop();
+                    self.push(a - b);
+                    self.pc += 1;
+                }
+                Instruction::Le => {
+                    let b = self.pop();
+                    let a = self.pop();
+                    self.push((a <= b) as u32);
+                    self.pc += 1;
                 }
             }
         }
@@ -135,6 +162,11 @@ impl Vm {
         let value = self.stack[self.sp as usize];
         self.sp -= 1;
         value
+    }
+
+    fn operand(&mut self) -> u32 {
+        self.pc += 1;
+        self.code[self.pc as usize]
     }
 }
 
