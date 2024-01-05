@@ -20,7 +20,8 @@ let to_little_endian_32 = (i: int): list<int> => {
 
 module Ast = {
   type rec expr =
-    | Cst(int)
+    | CstI(int)
+    | CstB(bool)
     | Add(expr, expr)
     | Sub(expr, expr)
     | Mul(expr, expr)
@@ -82,7 +83,8 @@ module Resolve = {
   type ident = {name: string, stamp: int, ty: ident_type}
 
   type rec expr =
-    | Cst(int)
+    | CstI(int)
+    | CstB(bool)
     | Add(expr, expr)
     | Sub(expr, expr)
     | Mul(expr, expr)
@@ -94,6 +96,102 @@ module Resolve = {
     | If(expr, expr, expr)
 
   type env = list<(string, ident)>
+
+  type rec typ = TInt | TBool | TVar(string) | TFun(list<typ>, typ)
+
+  type constraints = list<(typ, typ)>
+
+  type context = list<(ident, typ)>
+
+  let last_type_id = ref(0)
+
+  let to_ident_string = (id: ident) => {
+    id.name ++
+    "/" ++
+    switch id.ty {
+    | Branch => "branch"
+    | Function => "fn"
+    | Var => "var"
+    }
+  }
+
+  let new_type = () => {
+    last_type_id := last_type_id.contents + 1
+    TVar(last_type_id.contents->Belt.Int.toString)
+  }
+
+  let rec to_type_string = (typ: typ): string => {
+    switch typ {
+    | TInt => "Int"
+    | TBool => "Bool"
+    | TVar(name) => "T" ++ name ++ ""
+    | TFun(params, typ) =>
+      params->Belt.List.reduce("", (s, typ) => s ++ to_type_string(typ) ++ ",") ++
+      "->" ++
+      to_type_string(typ)
+    }
+  }
+
+  // 生成约束，视频原版是支持 closure，这里是不支持 closure 的情况，支持递归。
+  let rec check_expr = (ctx: context, expr: expr): (typ, constraints) => {
+    switch expr {
+    | CstI(_) => (TInt, list{})
+    | CstB(_) => (TBool, list{})
+    | Add(e1, e2) | Sub(e1, e2) | Mul(e1, e2) => {
+        let (e1_type, e1_c) = check_expr(ctx, e1)
+        let (e2_type, e2_c) = check_expr(ctx, e2)
+        (TInt, list{(e1_type, TInt), (e2_type, TInt), ...e1_c, ...e2_c})
+      }
+    | Le(e1, e2) => {
+        let (e1_type, e1_c) = check_expr(ctx, e1)
+        let (e2_type, e2_c) = check_expr(ctx, e2)
+        (TBool, list{(e1_type, TInt), (e2_type, TInt), ...e1_c, ...e2_c})
+      }
+    | Var(name) => {
+        let (_, typ) = List.find(((ident, _)) => ident.stamp === name.stamp, ctx)
+        (typ, list{})
+      }
+    | Let(name, Fn(params, body), expr) => {
+        let ret_type = new_type()
+        let param_types = params->Belt.List.map(_ => new_type())
+        let fn_type = TFun(param_types, ret_type)
+        let ctx = list{(name, fn_type), ...Belt.List.zip(params, param_types), ...ctx}
+        let (body_typ, body_c) = check_expr(ctx, body)
+        let (let_type, let_c) = check_expr(ctx, expr)
+        (let_type, list{(ret_type, body_typ), ...body_c, ...let_c})
+      }
+    | Fn(_, _) => assert false
+    | App(name, args) => {
+        let t = new_type()
+        let (_, fn_type) = List.find(((ident, _)) => ident.stamp === name.stamp, ctx)
+        let (arg_types, cs) = args->Belt.List.map(i => check_expr(ctx, i))->Belt.List.unzip
+        let c = (fn_type, TFun(arg_types, t))
+        (t, list{c, ...List.concat(cs)})
+      }
+    | If(cond, e1, e2) => {
+        let t = new_type()
+        let (cond_typ, cond_cs) = check_expr(ctx, cond)
+        let (e1_typ, c1) = check_expr(ctx, e1)
+        let (e2_typ, c2) = check_expr(ctx, e2)
+        let c = list{(cond_typ, TBool), (e1_typ, t), (e2_typ, t)}
+        (t, list{...c, ...cond_cs, ...c1, ...c2})
+      }
+    | _ => assert false
+    }
+  }
+
+  type subst = list<(string, typ)>
+
+  // 消元，生成替换信息。
+  let solve = (cs: constraints): subst => {
+    for i in 0 to cs->Belt.List.length - 1 {
+      let (key, value) = cs->List.nth(i)
+      let key = to_type_string(key)
+      let value = to_type_string(value)
+      Js.log(key ++ " = " ++ value)
+    }
+    list{}
+  }
 
   let last_id = ref(0)
 
@@ -115,11 +213,12 @@ module Resolve = {
   let compile = (expr: Ast.expr) => {
     let rec compile_inner = (expr: Ast.expr, env: env) => {
       switch expr {
-      | Cst(i) => Cst(i)
+      | CstI(i) => CstI(i)
       | Add(a, b) => Add(compile_inner(a, env), compile_inner(b, env))
       | Sub(a, b) => Sub(compile_inner(a, env), compile_inner(b, env))
       | Mul(a, b) => Mul(compile_inner(a, env), compile_inner(b, env))
       | Le(a, b) => Le(compile_inner(a, env), compile_inner(b, env))
+      // todo 此处报错了！！！
       | Var(name) => Var(List.assoc(name, env))
       | Let(name, e1, e2) => {
           let ident = switch e1 {
@@ -321,7 +420,7 @@ module Vm = {
   let preprocess = (expr: Resolve.expr): list<fun> => {
     let rec preprocess_rec = (expr: Resolve.expr): (expr, list<fun>) => {
       switch expr {
-      | Cst(i) => (Cst(i), list{})
+      | CstI(i) => (Cst(i), list{})
       | Var(binding) => (Var(binding), list{})
       | Add(a, b) => {
           let (a_expr, a_fns) = preprocess_rec(a)
@@ -395,7 +494,20 @@ module Vm = {
           ...compile_inner(e2, list{Stmp, ...env}, if_label + 2),
           Mul,
         }
-      | Var(name) => list{Var(find_local_index(env, name))}
+      | Var(name) => {
+          Js.log("finding: " ++ Resolve.to_ident_string(name))
+          Js.log(
+            "env: " ++
+            env->Belt.List.reduce("", (s, i) =>
+              s ++
+              switch i {
+              | Slocal(ident) => ident.name ++ "/" ++ ident.stamp->Belt.Int.toString ++ ","
+              | _ => ""
+              }
+            ),
+          )
+          list{Var(find_local_index(env, name))}
+        }
       | Let(name, e1, e2) =>
         list{
           ...compile_inner(e1, env, if_label + 1),
@@ -445,6 +557,8 @@ module Vm = {
 
   let compile_prog = (expr: Ast.expr): instrs => {
     let expr = Resolve.compile(expr)
+    let (typ, cs) = Resolve.check_expr(list{}, expr)
+    let subst = Resolve.solve(cs)
     let fns = preprocess(expr)->Belt.List.map(fn => compile_fun(fn))->Belt.List.flatten
     list{Call(ident_main, 0), Exit, ...fns}
   }
@@ -722,16 +836,25 @@ let my_expr = Ast.Let(
   Ast.Fn(
     list{"n"},
     Ast.If(
-      Ast.Le(Var("n"), Ast.Cst(1)),
-      Cst(1),
+      Ast.Le(Var("n"), Ast.CstI(1)),
+      CstI(1),
       Ast.Add(
-        Ast.App("fib", list{Ast.Sub(Ast.Var("n"), Ast.Cst(1))}),
-        Ast.App("fib", list{Ast.Sub(Ast.Var("n"), Ast.Cst(2))}),
+        Ast.App("fib", list{Ast.Sub(Ast.Var("n"), Ast.CstI(1))}),
+        Ast.App("fib", list{Ast.Sub(Ast.Var("n"), Ast.CstI(2))}),
       ),
     ),
   ),
-  Ast.App("fib", list{Ast.Cst(10)}),
+  Ast.App("fib", list{Ast.CstI(10)}),
 )
+
+// let my_expr = Ast.Let(
+//   "infer",
+//   Fn(
+//     list{"f", "a", "b"},
+//     If(Var("a"), Add(App("f", list{Var("b")}), CstI(1)), App("f", list{Var("a")})),
+//   ),
+//   App("infer", list{Var("myf"), CstI(1), CstI(2)}),
+// )
 
 // let my_nameless = Nameless.compile(my_expr)
 // Js.log("Nameless:")
@@ -759,7 +882,6 @@ Node.Fs.writeFileSync("bytecode.bin", bytecode, #hex)
 
 // machine code
 let assembly = Native.optimize(Native.compile_vm(instrs2))
-Js.log("==> native ir:")
 Node.Fs.writeFileSync("machine_code.s", Native.print(assembly), #utf8)
 
 // Js.log("==> machine code:")
