@@ -4,6 +4,7 @@ use std::{iter::Peekable, str::Chars};
 pub(crate) enum Token {
     Id(String),
     Num(String),
+    TimeLiteral(String, char),
     LParen,
     RParen,
     Plus,
@@ -57,12 +58,17 @@ impl<'c> Tokenizer<'c> {
                             has_dot = true;
                             true
                         } else {
-                            ch.is_ascii_alphanumeric()
+                            ch.is_ascii_digit()
                         }
                     }) {
                         num_str.push(ch);
                     }
-                    self.token = Token::Num(num_str);
+                    if let Some(unit) = self.code.next_if(|ch| matches!(ch, 't' | 'd' | 'h' | 's'))
+                    {
+                        self.token = Token::TimeLiteral(num_str, unit);
+                    } else {
+                        self.token = Token::Num(num_str);
+                    }
                 }
                 ch if ch.is_ascii_whitespace() => continue,
                 ch => panic!("invalid token: {ch}"),
@@ -106,6 +112,14 @@ fn test_tokenizer() {
             Token::Minus,
             Token::Num("4".to_string()),
             Token::RParen,
+        ]
+    );
+    assert_eq!(
+        to_token_list("1t + 2d"),
+        vec![
+            Token::TimeLiteral("1".to_string(), 't'),
+            Token::Plus,
+            Token::TimeLiteral("2".to_string(), 'd'),
         ]
     );
 }
