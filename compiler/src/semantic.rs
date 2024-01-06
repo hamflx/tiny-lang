@@ -63,6 +63,7 @@ fn check_expr(ctx: &Context, expr: &resolution::Expr) -> (Typ, Constraints) {
             )
         }
         resolution::Expr::Fn(_) => todo!(),
+        resolution::Expr::App(_, _) => todo!(),
     }
 }
 

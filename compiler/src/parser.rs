@@ -23,6 +23,7 @@ pub(crate) enum Expression {
     TimeSpan(usize),
     Fn(Box<FnExpression>),
     Let(Box<LetExpression>),
+    App(String, Vec<Expression>),
     BinaryOperation(Box<BinaryExpression>),
 }
 

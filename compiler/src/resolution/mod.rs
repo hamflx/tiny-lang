@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::{
     parser::{BinaryOperator, Expression},
-    utils::expression::{integer, let_expr, let_fn, op_mul, op_sub, var},
+    utils::expression::{app_fn, integer, let_expr, let_fn, op_mul, op_sub, var},
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -21,6 +21,7 @@ pub(crate) enum Expr {
     TimeSpan(usize),
     Fn(Box<FnExpression>),
     Let(Box<LetExpression>),
+    App(Identifier, Vec<Expr>),
     BinaryOperation(Box<BinaryExpression>),
 }
 
@@ -96,6 +97,13 @@ fn compile_impl(expr: &Expression, env: Vec<Identifier>) -> Expr {
             let body = compile_impl(&expr.body, env);
             Expr::Fn(FnExpression { params, body }.into())
         }
+        Expression::App(name, args) => {
+            let id = env.iter().find(|i| i.name == *name).unwrap().clone();
+            Expr::App(
+                id,
+                args.iter().map(|e| compile_impl(e, env.clone())).collect(),
+            )
+        }
     }
 }
 
@@ -105,17 +113,21 @@ pub(crate) fn compile(expr: &Expression) -> Expr {
 
 #[test]
 fn test_resolve() {
-    let expr = let_fn(
-        &["discount"],
-        let_expr(
-            "count",
-            integer(3),
+    let expr = let_expr(
+        "calc",
+        let_fn(
+            &["discount"],
             let_expr(
-                "price",
-                integer(5),
-                op_sub(op_mul(var("price"), var("count")), var("discount")),
+                "count",
+                integer(3),
+                let_expr(
+                    "price",
+                    integer(5),
+                    op_sub(op_mul(var("price"), var("count")), var("discount")),
+                ),
             ),
         ),
+        app_fn("calc", &[integer(2)]),
     );
     let expr = compile(&expr);
     println!("expr: {:#?}", expr);

@@ -41,6 +41,10 @@ pub(crate) fn let_fn(params: &[&str], body: Expression) -> Expression {
     )
 }
 
+pub(crate) fn app_fn(name: &str, args: &[Expression]) -> Expression {
+    Expression::App(name.to_string(), args.iter().cloned().collect())
+}
+
 pub(crate) fn op_add(left: Expression, right: Expression) -> Expression {
     Expression::BinaryOperation(BinaryExpression::new(BinaryOperator::Add, left, right).into())
 }
