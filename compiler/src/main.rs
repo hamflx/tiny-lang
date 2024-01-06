@@ -29,6 +29,7 @@ fn evaluate(expr: &Expression, env: &HashMap<String, isize>) -> isize {
         Expression::Let(_) => todo!(),
         Expression::Instant(_) => todo!(),
         Expression::TimeSpan(_) => todo!(),
+        Expression::Fn(_) => todo!(),
     }
 }
 

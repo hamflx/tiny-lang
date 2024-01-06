@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::{
     parser::{BinaryOperator, Expression},
-    utils::expression::{integer, let_expr, op_mul, op_sub, var},
+    utils::expression::{integer, let_expr, let_fn, op_mul, op_sub, var},
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -19,6 +19,7 @@ pub(crate) enum Expr {
     CstB(bool),
     Instant(usize),
     TimeSpan(usize),
+    Fn(Box<FnExpression>),
     Let(Box<LetExpression>),
     BinaryOperation(Box<BinaryExpression>),
 }
@@ -34,6 +35,12 @@ impl BinaryExpression {
     fn new(op: BinaryOperator, left: Expr, right: Expr) -> Self {
         Self { op, left, right }
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct FnExpression {
+    pub(crate) params: Vec<Identifier>,
+    pub(crate) body: Expr,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -79,6 +86,16 @@ fn compile_impl(expr: &Expression, env: Vec<Identifier>) -> Expr {
             let right = compile_impl(&expr.right, env.clone());
             Expr::BinaryOperation(BinaryExpression::new(expr.op.clone(), left, right).into())
         }
+        Expression::Fn(expr) => {
+            let params: Vec<_> = expr
+                .params
+                .iter()
+                .map(|p| make_identifier(p.clone()))
+                .collect();
+            let env = params.iter().cloned().chain(env.clone()).collect();
+            let body = compile_impl(&expr.body, env);
+            Expr::Fn(FnExpression { params, body }.into())
+        }
     }
 }
 
@@ -88,15 +105,14 @@ pub(crate) fn compile(expr: &Expression) -> Expr {
 
 #[test]
 fn test_resolve() {
-    let expr = let_expr(
-        "count",
-        integer(3),
+    let expr = let_fn(
+        &["discount"],
         let_expr(
-            "price",
-            integer(5),
+            "count",
+            integer(3),
             let_expr(
-                "discount",
-                integer(1),
+                "price",
+                integer(5),
                 op_sub(op_mul(var("price"), var("count")), var("discount")),
             ),
         ),

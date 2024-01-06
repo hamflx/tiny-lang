@@ -1,4 +1,4 @@
-use crate::parser::{BinaryExpression, BinaryOperator, Expression, LetExpression};
+use crate::parser::{BinaryExpression, BinaryOperator, Expression, FnExpression, LetExpression};
 
 pub(crate) fn id(name: String) -> Expression {
     Expression::Var(name)
@@ -26,6 +26,16 @@ pub(crate) fn let_expr(name: &str, value: Expression, scope: Expression) -> Expr
             name: name.to_string(),
             scope,
             value,
+        }
+        .into(),
+    )
+}
+
+pub(crate) fn let_fn(params: &[&str], body: Expression) -> Expression {
+    Expression::Fn(
+        FnExpression {
+            params: params.iter().map(|s| s.to_string()).collect(),
+            body,
         }
         .into(),
     )

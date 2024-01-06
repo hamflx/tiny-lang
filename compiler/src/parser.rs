@@ -8,6 +8,12 @@ pub(crate) struct LetExpression {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub(crate) struct FnExpression {
+    pub(crate) params: Vec<String>,
+    pub(crate) body: Expression,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Expression {
     Var(String),
     CstI(isize),
@@ -15,6 +21,7 @@ pub(crate) enum Expression {
     CstB(bool),
     Instant(usize),
     TimeSpan(usize),
+    Fn(Box<FnExpression>),
     Let(Box<LetExpression>),
     BinaryOperation(Box<BinaryExpression>),
 }
