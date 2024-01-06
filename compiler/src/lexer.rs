@@ -4,7 +4,7 @@ use std::{iter::Peekable, str::Chars};
 pub(crate) enum Token {
     Id(String),
     Num(String),
-    TimeLiteral(String, char),
+    TimeLiteral(String, TimeUnit),
     LParen,
     RParen,
     Plus,
@@ -12,6 +12,28 @@ pub(crate) enum Token {
     Mul,
     Div,
     Eof,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum TimeUnit {
+    Timestamp,
+    Day,
+    Hour,
+    Second,
+}
+
+impl TryFrom<char> for TimeUnit {
+    type Error = &'static str;
+
+    fn try_from(value: char) -> Result<Self, Self::Error> {
+        Ok(match value {
+            't' => TimeUnit::Timestamp,
+            'd' => TimeUnit::Day,
+            'h' => TimeUnit::Hour,
+            's' => TimeUnit::Second,
+            _ => return Err("unknown unit"),
+        })
+    }
 }
 
 pub(crate) struct Tokenizer<'c> {
@@ -63,9 +85,8 @@ impl<'c> Tokenizer<'c> {
                     }) {
                         num_str.push(ch);
                     }
-                    if let Some(unit) = self.code.next_if(|ch| matches!(ch, 't' | 'd' | 'h' | 's'))
-                    {
-                        self.token = Token::TimeLiteral(num_str, unit);
+                    if let Some(unit) = self.code.next_if(|ch| TimeUnit::try_from(*ch).is_ok()) {
+                        self.token = Token::TimeLiteral(num_str, TimeUnit::try_from(unit).unwrap());
                     } else {
                         self.token = Token::Num(num_str);
                     }
@@ -117,9 +138,9 @@ fn test_tokenizer() {
     assert_eq!(
         to_token_list("1t + 2d"),
         vec![
-            Token::TimeLiteral("1".to_string(), 't'),
+            Token::TimeLiteral("1".to_string(), TimeUnit::Timestamp),
             Token::Plus,
-            Token::TimeLiteral("2".to_string(), 'd'),
+            Token::TimeLiteral("2".to_string(), TimeUnit::Day),
         ]
     );
 }

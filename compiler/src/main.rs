@@ -1,5 +1,6 @@
 mod lexer;
 mod parser;
+mod semantic;
 
 use std::collections::HashMap;
 
@@ -20,6 +21,8 @@ fn evaluate(expr: &Expression, env: &HashMap<String, isize>) -> isize {
                 BinaryOperator::Div => left / right,
             }
         }
+        Expression::Instant(_) => todo!(),
+        Expression::TimeSpan(_) => todo!(),
     }
 }
 

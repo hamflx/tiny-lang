@@ -1,4 +1,4 @@
-use crate::lexer::{Token, Tokenizer};
+use crate::lexer::{TimeUnit, Token, Tokenizer};
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum NumberValue {
@@ -10,6 +10,8 @@ pub(crate) enum NumberValue {
 pub(crate) enum Expression {
     Id(String),
     Number(NumberValue),
+    Instant(usize),
+    TimeSpan(usize),
     BinaryOperation(Box<BinaryExpression>),
 }
 
@@ -50,6 +52,18 @@ fn parse_factor(tokenizer: &mut Tokenizer) -> Expression {
             tokenizer.advance();
             expr
         }
+        Token::TimeLiteral(num, unit) => {
+            let expr = match unit {
+                TimeUnit::Timestamp => Expression::Instant(num.parse::<usize>().unwrap()),
+                TimeUnit::Day => {
+                    Expression::TimeSpan(num.parse::<usize>().unwrap() * 24 * 3600 * 1000)
+                }
+                TimeUnit::Hour => Expression::TimeSpan(num.parse::<usize>().unwrap() * 3600 * 1000),
+                TimeUnit::Second => Expression::TimeSpan(num.parse::<usize>().unwrap() * 1000),
+            };
+            tokenizer.advance();
+            expr
+        }
         Token::LParen => {
             tokenizer.eat(Token::LParen);
             let expr = parse_expression(tokenizer);
@@ -70,6 +84,22 @@ fn parse_factor(tokenizer: &mut Tokenizer) -> Expression {
                     } else {
                         NumberValue::Integer(num.parse().unwrap())
                     });
+                    tokenizer.advance();
+                    expr
+                }
+                Token::TimeLiteral(num, unit) => {
+                    let expr = match unit {
+                        TimeUnit::Timestamp => Expression::Instant(num.parse::<usize>().unwrap()),
+                        TimeUnit::Day => {
+                            Expression::TimeSpan(num.parse::<usize>().unwrap() * 24 * 3600 * 1000)
+                        }
+                        TimeUnit::Hour => {
+                            Expression::TimeSpan(num.parse::<usize>().unwrap() * 3600 * 1000)
+                        }
+                        TimeUnit::Second => {
+                            Expression::TimeSpan(num.parse::<usize>().unwrap() * 1000)
+                        }
+                    };
                     tokenizer.advance();
                     expr
                 }
@@ -115,7 +145,7 @@ fn parse_term_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
 
 fn parse_term(tokenizer: &mut Tokenizer) -> Expression {
     match tokenizer.token() {
-        Token::Id(_) | Token::Num(_) | Token::Minus | Token::LParen => {
+        Token::Id(_) | Token::Num(_) | Token::TimeLiteral(_, _) | Token::Minus | Token::LParen => {
             let factor = parse_factor(tokenizer);
             parse_term_(tokenizer, factor)
         }
@@ -144,7 +174,7 @@ fn parse_expression_(tokenizer: &mut Tokenizer, left: Expression) -> Expression 
 
 fn parse_expression(tokenizer: &mut Tokenizer) -> Expression {
     match tokenizer.token() {
-        Token::Id(_) | Token::Num(_) | Token::Minus | Token::LParen => {
+        Token::Id(_) | Token::Num(_) | Token::TimeLiteral(_, _) | Token::Minus | Token::LParen => {
             let term = parse_term(tokenizer);
             parse_expression_(tokenizer, term)
         }
@@ -154,7 +184,7 @@ fn parse_expression(tokenizer: &mut Tokenizer) -> Expression {
 
 fn parse_program(tokenizer: &mut Tokenizer) -> Expression {
     match tokenizer.token() {
-        Token::Id(_) | Token::Num(_) | Token::Minus | Token::LParen => {
+        Token::Id(_) | Token::Num(_) | Token::TimeLiteral(_, _) | Token::Minus | Token::LParen => {
             let expr = parse_expression(tokenizer);
             tokenizer.eat(Token::Eof);
             expr
@@ -171,10 +201,8 @@ pub(crate) fn parse_code(code: &str) -> Expression {
 
 #[test]
 fn test_parser() {
-    let mut tokenizer = Tokenizer::new("1 + 2 * (3 - 4)");
-    tokenizer.advance();
     assert_eq!(
-        parse_program(&mut tokenizer),
+        parse_code("1 + 2 * (3 - 4)"),
         Expression::BinaryOperation(
             BinaryExpression::new(
                 BinaryOperator::Add,
@@ -194,6 +222,17 @@ fn test_parser() {
                     )
                     .into()
                 )
+            )
+            .into()
+        )
+    );
+    assert_eq!(
+        parse_code("1t + 2d"),
+        Expression::BinaryOperation(
+            BinaryExpression::new(
+                BinaryOperator::Add,
+                Expression::Instant(1),
+                Expression::TimeSpan(2 * 24 * 3600 * 1000)
             )
             .into()
         )
