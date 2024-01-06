@@ -2,12 +2,13 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::{
     parser::Expression,
-    utils::expression::{integer, op_add, time_span, timestamp},
+    resolution,
+    utils::expression::{integer, let_expr, op_add, op_mul, op_sub, time_span, timestamp, var},
 };
 
 type Constraints = Vec<(Typ, Typ)>;
 
-type Context = Vec<(String, Typ)>;
+type Context = Vec<(resolution::Identifier, Typ)>;
 
 type Substituation = Vec<(String, Typ)>;
 
@@ -33,18 +34,23 @@ fn new_var() -> Typ {
     Typ::Var(id)
 }
 
-fn check_expr(ctx: &Context, expr: &Expression) -> (Typ, Constraints) {
+fn check_expr(ctx: &Context, expr: &resolution::Expr) -> (Typ, Constraints) {
     match expr {
-        Expression::Var(id) => (
+        resolution::Expr::Var(id) => (
             ctx.iter().find(|(name, _)| name == id).unwrap().1.clone(),
             Vec::new(),
         ),
-        Expression::CstI(_) => (Typ::Int, Vec::new()),
-        Expression::CstF(_) => todo!(),
-        Expression::CstB(_) => todo!(),
-        Expression::Instant(_) => (Typ::Instant, Vec::new()),
-        Expression::TimeSpan(_) => (Typ::Duration, Vec::new()),
-        Expression::BinaryOperation(expr) => {
+        resolution::Expr::CstI(_) => (Typ::Int, Vec::new()),
+        resolution::Expr::CstF(_) => todo!(),
+        resolution::Expr::CstB(_) => todo!(),
+        resolution::Expr::Instant(_) => (Typ::Instant, Vec::new()),
+        resolution::Expr::TimeSpan(_) => (Typ::Duration, Vec::new()),
+        resolution::Expr::Let(expr) => {
+            check_expr(ctx, &expr.value);
+            check_expr(ctx, &expr.scope);
+            todo!();
+        }
+        resolution::Expr::BinaryOperation(expr) => {
             let (t1, c1) = check_expr(ctx, &expr.left);
             let (t2, c2) = check_expr(ctx, &expr.right);
             (
@@ -56,17 +62,29 @@ fn check_expr(ctx: &Context, expr: &Expression) -> (Typ, Constraints) {
                     .collect(),
             )
         }
-        Expression::Let(_) => todo!(),
     }
 }
 
 #[test]
 fn test_check_expr() {
-    // let ctx: Context = vec![("time_add".to_string(), Typ::Arrow())];
-    // let (typ, constraints) = check_expr(&Vec::new(), &op_add(integer(1), integer(2)));
-    // let (typ, constraints) = check_expr(&Vec::new(), &op_add(timestamp(1), time_span(1)));
-    // println!("typ: {:#?}", typ);
-    // println!("constraints: {:#?}", constraints);
+    let expr = let_expr(
+        "count",
+        integer(3),
+        let_expr(
+            "price",
+            integer(5),
+            let_expr(
+                "discount",
+                integer(1),
+                op_sub(op_mul(var("price"), var("count")), var("discount")),
+            ),
+        ),
+    );
+    let expr = resolution::compile(&expr);
+    let (typ, constraints) = check_expr(&Vec::new(), &expr);
+    println!("expr: {:#?}", expr);
+    println!("typ: {:#?}", typ);
+    println!("constraints: {:#?}", constraints);
 }
 
 fn solve(cs: Constraints) -> Substituation {

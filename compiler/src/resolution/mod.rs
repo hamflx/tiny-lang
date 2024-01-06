@@ -6,13 +6,13 @@ use crate::{
 };
 
 #[derive(Debug, Clone, PartialEq)]
-struct Identifier {
+pub(crate) struct Identifier {
     name: String,
     stamp: usize,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-enum Expr {
+pub(crate) enum Expr {
     Var(Identifier),
     CstI(isize),
     CstF(f64),
@@ -24,10 +24,10 @@ enum Expr {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-struct BinaryExpression {
-    op: BinaryOperator,
-    left: Expr,
-    right: Expr,
+pub(crate) struct BinaryExpression {
+    pub(crate) op: BinaryOperator,
+    pub(crate) left: Expr,
+    pub(crate) right: Expr,
 }
 
 impl BinaryExpression {
@@ -37,10 +37,10 @@ impl BinaryExpression {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-struct LetExpression {
-    name: Identifier,
-    value: Expr,
-    scope: Expr,
+pub(crate) struct LetExpression {
+    pub(crate) name: Identifier,
+    pub(crate) value: Expr,
+    pub(crate) scope: Expr,
 }
 
 static LAST_IDENTIFIER_STAMP: AtomicUsize = AtomicUsize::new(0);
@@ -82,7 +82,7 @@ fn compile_impl(expr: &Expression, env: Vec<Identifier>) -> Expr {
     }
 }
 
-fn compile(expr: &Expression) -> Expr {
+pub(crate) fn compile(expr: &Expression) -> Expr {
     compile_impl(expr, Vec::new())
 }
 
