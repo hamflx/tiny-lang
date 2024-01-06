@@ -1,16 +1,21 @@
+mod compile;
 mod lexer;
 mod parser;
+mod resolution;
 mod semantic;
+mod utils;
+mod vm;
 
 use std::collections::HashMap;
 
-use parser::{parse_code, BinaryOperator, Expression, NumberValue};
+use parser::{parse_code, BinaryOperator, Expression};
 
 fn evaluate(expr: &Expression, env: &HashMap<String, isize>) -> isize {
     match expr {
-        Expression::Id(ident) => env[ident],
-        Expression::Number(NumberValue::Integer(int)) => *int,
-        Expression::Number(NumberValue::Float(_)) => todo!(),
+        Expression::Var(ident) => env[ident],
+        Expression::CstI(int) => *int,
+        Expression::CstF(_) => todo!(),
+        Expression::CstB(_) => todo!(),
         Expression::BinaryOperation(expr) => {
             let left = evaluate(&expr.left, env);
             let right = evaluate(&expr.right, env);
@@ -21,6 +26,7 @@ fn evaluate(expr: &Expression, env: &HashMap<String, isize>) -> isize {
                 BinaryOperator::Div => left / right,
             }
         }
+        Expression::Let(_) => todo!(),
         Expression::Instant(_) => todo!(),
         Expression::TimeSpan(_) => todo!(),
     }

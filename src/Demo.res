@@ -214,6 +214,7 @@ module Resolve = {
     let rec compile_inner = (expr: Ast.expr, env: env) => {
       switch expr {
       | CstI(i) => CstI(i)
+      | CstB(b) => CstB(b)
       | Add(a, b) => Add(compile_inner(a, env), compile_inner(b, env))
       | Sub(a, b) => Sub(compile_inner(a, env), compile_inner(b, env))
       | Mul(a, b) => Mul(compile_inner(a, env), compile_inner(b, env))
@@ -391,7 +392,8 @@ module Vm = {
   type senv = list<sv>
 
   type rec expr =
-    | Cst(int)
+    | CstI(int)
+    | CstB(bool)
     | Add(expr, expr)
     | Sub(expr, expr)
     | Mul(expr, expr)
@@ -420,7 +422,8 @@ module Vm = {
   let preprocess = (expr: Resolve.expr): list<fun> => {
     let rec preprocess_rec = (expr: Resolve.expr): (expr, list<fun>) => {
       switch expr {
-      | CstI(i) => (Cst(i), list{})
+      | CstI(i) => (CstI(i), list{})
+      | CstB(b) => (CstB(b), list{})
       | Var(binding) => (Var(binding), list{})
       | Add(a, b) => {
           let (a_expr, a_fns) = preprocess_rec(a)
@@ -475,7 +478,7 @@ module Vm = {
   let compile_expr = (expr: expr, env: senv): instrs => {
     let rec compile_inner = (expr: expr, env: senv, if_label: int): instrs => {
       switch expr {
-      | Cst(i) => list{Cst(i)}
+      | CstI(i) => list{Cst(i)}
       | Add(e1, e2) =>
         list{
           ...compile_inner(e1, env, if_label + 1),
@@ -870,8 +873,8 @@ let my_expr = Ast.Let(
 
 let instrs2 = Vm.compile_prog(my_expr)
 
-Js.log("==> single pass:")
-Vm.print(instrs2)
+// Js.log("==> single pass:")
+// Vm.print(instrs2)
 
 // Js.log(Ast.eval(my_expr))
 // Js.log(Vm.eval(instrs, list{}))

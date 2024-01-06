@@ -394,15 +394,10 @@ function compile(expr) {
                   _0: expr._0
                 };
       case /* CstB */1 :
-          throw {
-                RE_EXN_ID: "Match_failure",
-                _1: [
-                  "Demo.res",
-                  215,
-                  6
-                ],
-                Error: new Error()
-              };
+          return {
+                  TAG: /* CstB */1,
+                  _0: expr._0
+                };
       case /* Add */2 :
           return {
                   TAG: /* Add */2,
@@ -687,27 +682,25 @@ function preprocess(expr) {
       case /* CstI */0 :
           return [
                   {
-                    TAG: /* Cst */0,
+                    TAG: /* CstI */0,
                     _0: expr._0
                   },
                   /* [] */0
                 ];
       case /* CstB */1 :
-          throw {
-                RE_EXN_ID: "Match_failure",
-                _1: [
-                  "Demo.res",
-                  422,
-                  6
-                ],
-                Error: new Error()
-              };
+          return [
+                  {
+                    TAG: /* CstB */1,
+                    _0: expr._0
+                  },
+                  /* [] */0
+                ];
       case /* Add */2 :
           var match = preprocess_rec(expr._0);
           var match$1 = preprocess_rec(expr._1);
           return [
                   {
-                    TAG: /* Add */1,
+                    TAG: /* Add */2,
                     _0: match[0],
                     _1: match$1[0]
                   },
@@ -721,7 +714,7 @@ function preprocess(expr) {
           var match$3 = preprocess_rec(expr._1);
           return [
                   {
-                    TAG: /* Sub */2,
+                    TAG: /* Sub */3,
                     _0: match$2[0],
                     _1: match$3[0]
                   },
@@ -735,7 +728,7 @@ function preprocess(expr) {
           var match$5 = preprocess_rec(expr._1);
           return [
                   {
-                    TAG: /* Mul */3,
+                    TAG: /* Mul */4,
                     _0: match$4[0],
                     _1: match$5[0]
                   },
@@ -747,7 +740,7 @@ function preprocess(expr) {
       case /* Var */5 :
           return [
                   {
-                    TAG: /* Var */4,
+                    TAG: /* Var */5,
                     _0: expr._0
                   },
                   /* [] */0
@@ -777,7 +770,7 @@ function preprocess(expr) {
           var match$9 = preprocess_rec(expr._2);
           return [
                   {
-                    TAG: /* Let */5,
+                    TAG: /* Let */6,
                     _0: binding,
                     _1: match$8[0],
                     _2: match$9[0]
@@ -792,7 +785,7 @@ function preprocess(expr) {
                 RE_EXN_ID: "Assert_failure",
                 _1: [
                   "Demo.res",
-                  457,
+                  460,
                   20
                 ],
                 Error: new Error()
@@ -816,7 +809,7 @@ function preprocess(expr) {
                 }));
           return [
                   {
-                    TAG: /* App */6,
+                    TAG: /* App */7,
                     _0: expr._0,
                     _1: match$10[0]
                   },
@@ -827,7 +820,7 @@ function preprocess(expr) {
           var match$12 = preprocess_rec(expr._1);
           return [
                   {
-                    TAG: /* Le */7,
+                    TAG: /* Le */8,
                     _0: match$11[0],
                     _1: match$12[0]
                   },
@@ -842,7 +835,7 @@ function preprocess(expr) {
           var match$15 = preprocess_rec(expr._2);
           return [
                   {
-                    TAG: /* If */8,
+                    TAG: /* If */9,
                     _0: match$13[0],
                     _1: match$14[0],
                     _2: match$15[0]
@@ -870,7 +863,7 @@ function preprocess(expr) {
 function compile_expr(expr, env) {
   var compile_inner = function (expr, env, if_label) {
     switch (expr.TAG | 0) {
-      case /* Cst */0 :
+      case /* CstI */0 :
           return {
                   hd: {
                     TAG: /* Cst */0,
@@ -878,7 +871,17 @@ function compile_expr(expr, env) {
                   },
                   tl: /* [] */0
                 };
-      case /* Add */1 :
+      case /* CstB */1 :
+          throw {
+                RE_EXN_ID: "Match_failure",
+                _1: [
+                  "Demo.res",
+                  480,
+                  6
+                ],
+                Error: new Error()
+              };
+      case /* Add */2 :
           return Belt_List.concatMany([
                       compile_inner(expr._0, env, if_label + 1 | 0),
                       compile_inner(expr._1, {
@@ -890,7 +893,7 @@ function compile_expr(expr, env) {
                         tl: /* [] */0
                       }
                     ]);
-      case /* Sub */2 :
+      case /* Sub */3 :
           return Belt_List.concatMany([
                       compile_inner(expr._0, env, if_label + 1 | 0),
                       compile_inner(expr._1, {
@@ -902,7 +905,7 @@ function compile_expr(expr, env) {
                         tl: /* [] */0
                       }
                     ]);
-      case /* Mul */3 :
+      case /* Mul */4 :
           return Belt_List.concatMany([
                       compile_inner(expr._0, env, if_label + 1 | 0),
                       compile_inner(expr._1, {
@@ -914,7 +917,7 @@ function compile_expr(expr, env) {
                         tl: /* [] */0
                       }
                     ]);
-      case /* Var */4 :
+      case /* Var */5 :
           var name = expr._0;
           console.log("finding: " + to_ident_string(name));
           console.log("env: " + Belt_List.reduce(env, "", (function (s, i) {
@@ -934,7 +937,7 @@ function compile_expr(expr, env) {
                   },
                   tl: /* [] */0
                 };
-      case /* Let */5 :
+      case /* Let */6 :
           return Belt_List.concatMany([
                       compile_inner(expr._1, env, if_label + 1 | 0),
                       compile_inner(expr._2, {
@@ -951,7 +954,7 @@ function compile_expr(expr, env) {
                         }
                       }
                     ]);
-      case /* App */6 :
+      case /* App */7 :
           var args = expr._1;
           var match = Belt_List.reduceWithIndex(args, [
                 /* [] */0,
@@ -980,7 +983,7 @@ function compile_expr(expr, env) {
                         tl: /* [] */0
                       }
                     ]);
-      case /* Le */7 :
+      case /* Le */8 :
           return Belt_List.concatMany([
                       compile_inner(expr._0, env, if_label + 1 | 0),
                       compile_inner(expr._1, {
@@ -992,7 +995,7 @@ function compile_expr(expr, env) {
                         tl: /* [] */0
                       }
                     ]);
-      case /* If */8 :
+      case /* If */9 :
           var false_label = new_branch_ident("false");
           var end_of_if = new_branch_ident("end_of_if");
           return Belt_List.concatMany([
@@ -1293,7 +1296,7 @@ function compile_indexed(expr) {
               RE_EXN_ID: "Match_failure",
               _1: [
                 "Demo.res",
-                624,
+                627,
                 4
               ],
               Error: new Error()
@@ -1941,10 +1944,6 @@ var my_expr = {
 };
 
 var instrs2 = compile_prog(my_expr);
-
-console.log("==> single pass:");
-
-print$2(instrs2);
 
 var bytecode = to_hex(to_bytecode(Belt_List.concatMany([
               instrs2,

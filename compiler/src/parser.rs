@@ -1,17 +1,21 @@
 use crate::lexer::{TimeUnit, Token, Tokenizer};
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum NumberValue {
-    Integer(isize),
-    Float(f64),
+pub(crate) struct LetExpression {
+    pub(crate) name: String,
+    pub(crate) value: Expression,
+    pub(crate) scope: Expression,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Expression {
-    Id(String),
-    Number(NumberValue),
+    Var(String),
+    CstI(isize),
+    CstF(f64),
+    CstB(bool),
     Instant(usize),
     TimeSpan(usize),
+    Let(Box<LetExpression>),
     BinaryOperation(Box<BinaryExpression>),
 }
 
@@ -31,7 +35,7 @@ pub(crate) struct BinaryExpression {
 }
 
 impl BinaryExpression {
-    fn new(op: BinaryOperator, left: Expression, right: Expression) -> Self {
+    pub(crate) fn new(op: BinaryOperator, left: Expression, right: Expression) -> Self {
         Self { op, left, right }
     }
 }
@@ -39,16 +43,16 @@ impl BinaryExpression {
 fn parse_factor(tokenizer: &mut Tokenizer) -> Expression {
     match tokenizer.token() {
         Token::Id(ident) => {
-            let expr = Expression::Id(ident.clone());
+            let expr = Expression::Var(ident.clone());
             tokenizer.advance();
             expr
         }
         Token::Num(num) => {
-            let expr = Expression::Number(if num.contains('.') {
-                NumberValue::Float(num.parse().unwrap())
+            let expr = if num.contains('.') {
+                Expression::CstF(num.parse().unwrap())
             } else {
-                NumberValue::Integer(num.parse().unwrap())
-            });
+                Expression::CstI(num.parse().unwrap())
+            };
             tokenizer.advance();
             expr
         }
@@ -74,16 +78,16 @@ fn parse_factor(tokenizer: &mut Tokenizer) -> Expression {
             tokenizer.advance();
             let expr = match tokenizer.token() {
                 Token::Id(ident) => {
-                    let expr = Expression::Id(ident.clone());
+                    let expr = Expression::Var(ident.clone());
                     tokenizer.advance();
                     expr
                 }
                 Token::Num(num) => {
-                    let expr = Expression::Number(if num.contains('.') {
-                        NumberValue::Float(num.parse().unwrap())
+                    let expr = if num.contains('.') {
+                        Expression::CstF(num.parse().unwrap())
                     } else {
-                        NumberValue::Integer(num.parse().unwrap())
-                    });
+                        Expression::CstI(num.parse().unwrap())
+                    };
                     tokenizer.advance();
                     expr
                 }
@@ -112,12 +116,7 @@ fn parse_factor(tokenizer: &mut Tokenizer) -> Expression {
                 token => panic!("invalid token: {:#?}", token),
             };
             Expression::BinaryOperation(
-                BinaryExpression::new(
-                    BinaryOperator::Sub,
-                    Expression::Number(NumberValue::Integer(0)),
-                    expr,
-                )
-                .into(),
+                BinaryExpression::new(BinaryOperator::Sub, Expression::CstI(0), expr).into(),
             )
         }
         token => panic!("invalid token: {:#?}", token),
@@ -206,16 +205,16 @@ fn test_parser() {
         Expression::BinaryOperation(
             BinaryExpression::new(
                 BinaryOperator::Add,
-                Expression::Number(NumberValue::Integer(1)),
+                Expression::CstI(1),
                 Expression::BinaryOperation(
                     BinaryExpression::new(
                         BinaryOperator::Mul,
-                        Expression::Number(NumberValue::Integer(2)),
+                        Expression::CstI(2),
                         Expression::BinaryOperation(
                             BinaryExpression::new(
                                 BinaryOperator::Sub,
-                                Expression::Number(NumberValue::Integer(3)),
-                                Expression::Number(NumberValue::Integer(4))
+                                Expression::CstI(3),
+                                Expression::CstI(4)
                             )
                             .into()
                         )
