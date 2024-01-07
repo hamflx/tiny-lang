@@ -132,6 +132,23 @@ module Resolve = {
     }
   }
 
+  let dump_env = (ctx: context) => {
+    for i in 0 to ctx->Belt.List.length - 1 {
+      let (ident, typ) = ctx->List.nth(i)
+      let typ_name = to_type_string(typ)
+      Js.log(ident.name ++ " = " ++ typ_name)
+    }
+  }
+
+  let dump_constraints = (cs: constraints) => {
+    for i in 0 to cs->Belt.List.length - 1 {
+      let (key, value) = cs->List.nth(i)
+      let key = to_type_string(key)
+      let value = to_type_string(value)
+      Js.log(key ++ " = " ++ value)
+    }
+  }
+
   // 生成约束，视频原版是支持 closure，这里是不支持 closure 的情况，支持递归。
   let rec check_expr = (ctx: context, expr: expr): (typ, constraints) => {
     switch expr {
@@ -151,21 +168,37 @@ module Resolve = {
         let (_, typ) = List.find(((ident, _)) => ident.stamp === name.stamp, ctx)
         (typ, list{})
       }
-    | Let(name, Fn(params, body), expr) => {
-        let ret_type = new_type()
+    // | Let(name, Fn(params, body), expr) => {
+    //     let ret_type = new_type()
+    //     let param_types = params->Belt.List.map(_ => new_type())
+    //     let fn_type = TFun(param_types, ret_type)
+    //     let ctx = list{(name, fn_type), ...Belt.List.zip(params, param_types), ...ctx}
+    //     let (body_typ, body_c) = check_expr(ctx, body)
+    //     let (let_type, let_c) = check_expr(ctx, expr)
+    //     Js.log("==> let: " ++ to_type_string(let_type))
+    //     dump_env(list{(name, fn_type), ...Belt.List.zip(params, param_types)})
+    //     dump_constraints(list{(ret_type, body_typ)})
+    //     (let_type, list{(ret_type, body_typ), ...body_c, ...let_c})
+    //   }
+    | Fn(params, body) => {
         let param_types = params->Belt.List.map(_ => new_type())
-        let fn_type = TFun(param_types, ret_type)
-        let ctx = list{(name, fn_type), ...Belt.List.zip(params, param_types), ...ctx}
-        let (body_typ, body_c) = check_expr(ctx, body)
-        let (let_type, let_c) = check_expr(ctx, expr)
-        (let_type, list{(ret_type, body_typ), ...body_c, ...let_c})
+        let ctx = list{...Belt.List.zip(params, param_types), ...ctx}
+        let (body_typ, cs) = check_expr(ctx, body)
+        (TFun(param_types, body_typ), cs)
       }
-    | Fn(_, _) => assert false
-    | App(name, args) => {
+    | Let(id, value_expr, scope_expr) => {
+        let (val_typ, val_cs) = check_expr(ctx, value_expr)
+        let ctx = list{(id, val_typ), ...ctx}
+        let (scope_typ, scope_cs) = check_expr(ctx, scope_expr)
+        (scope_typ, list{...val_cs, ...scope_cs})
+      }
+    | App(id, args) => {
         let t = new_type()
-        let (_, fn_type) = List.find(((ident, _)) => ident.stamp === name.stamp, ctx)
+        let (_, fn_type) = List.find(((ident, _)) => ident.stamp === id.stamp, ctx)
         let (arg_types, cs) = args->Belt.List.map(i => check_expr(ctx, i))->Belt.List.unzip
         let c = (fn_type, TFun(arg_types, t))
+        Js.log("==> app: " ++ to_type_string(t))
+        dump_constraints(list{c})
         (t, list{c, ...List.concat(cs)})
       }
     | If(cond, e1, e2) => {
@@ -174,6 +207,8 @@ module Resolve = {
         let (e1_typ, c1) = check_expr(ctx, e1)
         let (e2_typ, c2) = check_expr(ctx, e2)
         let c = list{(cond_typ, TBool), (e1_typ, t), (e2_typ, t)}
+        Js.log("==> if: " ++ to_type_string(t))
+        dump_constraints(c)
         (t, list{...c, ...cond_cs, ...c1, ...c2})
       }
     | _ => assert false
@@ -182,15 +217,64 @@ module Resolve = {
 
   type subst = list<(string, typ)>
 
+  let rec occurs = (typevar: string, typ: typ) => {
+    switch typ {
+    | TVar(x) => x == typevar
+    | TFun(arg_types, ret_type) =>
+      occurs(typevar, ret_type) || arg_types->Belt.List.some(t => occurs(typevar, t))
+    | _ => false
+    }
+  }
+
+  let replace_type = (typevar: string, typ: typ, cs: constraints): constraints => {
+    let rec replace = (typevar: string, typ: typ, to_typ: typ): typ => {
+      switch typ {
+      | TVar(x) if x == typevar => to_typ
+      | TFun(arg_types, ret_type) => {
+          let arg_types = arg_types->Belt.List.map(t => replace(typevar, t, to_typ))
+          let ret_type = replace(typevar, ret_type, to_typ)
+          TFun(arg_types, ret_type)
+        }
+      | t => t
+      }
+    }
+    cs->Belt.List.map(((t1, t2)) => (replace(typevar, t1, typ), replace(typevar, t2, typ)))
+  }
+
+  let dump_subst = (subst: subst) => {
+    Js.log("==> subst")
+    for i in 0 to subst->Belt.List.length - 1 {
+      let (typevar, typ) = List.nth(subst, i)
+      Js.log("    T" ++ typevar ++ " -> " ++ to_type_string(typ))
+    }
+  }
+
   // 消元，生成替换信息。
   let solve = (cs: constraints): subst => {
-    for i in 0 to cs->Belt.List.length - 1 {
-      let (key, value) = cs->List.nth(i)
-      let key = to_type_string(key)
-      let value = to_type_string(value)
-      Js.log(key ++ " = " ++ value)
+    let rec go = (cs: constraints, s): subst => {
+      switch cs {
+      | list{} => s
+      | list{c, ...rest} =>
+        switch c {
+        | (TInt, TInt) | (TBool, TBool) => go(rest, s)
+        | (TFun(t1, t2), TFun(t3, t4)) => {
+            let param_types = Belt.List.zip(t1, t3)
+            go(list{...param_types, (t2, t4), ...rest}, s)
+          }
+        | (TVar(x), t) | (t, TVar(x)) => {
+            assert !occurs(x, t)
+            go(replace_type(x, t, rest), list{(x, t), ...s})
+          }
+        | (t1, t2) =>
+          failwith(
+            "Expected type <" ++ to_type_string(t2) ++ ">, but got <" ++ to_type_string(t1) ++ ">",
+          )
+        }
+      }
     }
-    list{}
+    let subst = go(cs, list{})
+    dump_subst(subst)
+    subst
   }
 
   let last_id = ref(0)
@@ -497,20 +581,7 @@ module Vm = {
           ...compile_inner(e2, list{Stmp, ...env}, if_label + 2),
           Mul,
         }
-      | Var(name) => {
-          Js.log("finding: " ++ Resolve.to_ident_string(name))
-          Js.log(
-            "env: " ++
-            env->Belt.List.reduce("", (s, i) =>
-              s ++
-              switch i {
-              | Slocal(ident) => ident.name ++ "/" ++ ident.stamp->Belt.Int.toString ++ ","
-              | _ => ""
-              }
-            ),
-          )
-          list{Var(find_local_index(env, name))}
-        }
+      | Var(name) => list{Var(find_local_index(env, name))}
       | Let(name, e1, e2) =>
         list{
           ...compile_inner(e1, env, if_label + 1),
@@ -547,6 +618,7 @@ module Vm = {
             Label(end_of_if),
           }
         }
+      | CstB(_) => failwith("TODO")
       }
     }
     compile_inner(expr, env, 0)
@@ -834,21 +906,31 @@ module Native = {
 // n<=1
 // n-1<=0
 
+// let my_expr = Ast.Let(
+//   "calc",
+//   Ast.Fn(
+//     list{"discount"},
+//     Ast.If(Ast.Le(Var("discount"), Ast.CstI(1)), CstI(1), Ast.Add(CstI(1), CstI(1))),
+//   ),
+//   Ast.App("calc", list{Ast.CstI(10)}),
+// )
+
 let my_expr = Ast.Let(
-  "fib",
+  "calc",
   Ast.Fn(
-    list{"n"},
-    Ast.If(
-      Ast.Le(Var("n"), Ast.CstI(1)),
-      CstI(1),
-      Ast.Add(
-        Ast.App("fib", list{Ast.Sub(Ast.Var("n"), Ast.CstI(1))}),
-        Ast.App("fib", list{Ast.Sub(Ast.Var("n"), Ast.CstI(2))}),
-      ),
-    ),
+    list{"discount"},
+    Ast.If(Ast.Le(Var("discount"), Ast.CstI(1)), CstI(1), Ast.Add(CstI(1), CstI(1))),
   ),
-  Ast.App("fib", list{Ast.CstI(10)}),
+  Ast.App("calc", list{Ast.CstI(10)}),
 )
+
+// type error
+// let my_expr = Ast.Let(
+//   "calc",
+//   Ast.Fn(list{"discount"}, Ast.If(Ast.CstI(1), CstI(1), Ast.Add(CstI(1), CstI(1)))),
+//   Ast.App("calc", list{Ast.CstI(10)}),
+// )
+let my_expr = Ast.Add(Ast.Le(Ast.CstI(1), Ast.CstI(1)), CstI(1))
 
 // let my_expr = Ast.Let(
 //   "infer",

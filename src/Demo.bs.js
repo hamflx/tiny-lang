@@ -4,6 +4,7 @@ import * as Fs from "fs";
 import * as List from "rescript/lib/es6/list.js";
 import * as Process from "process";
 import * as Belt_List from "rescript/lib/es6/belt_List.js";
+import * as Pervasives from "rescript/lib/es6/pervasives.js";
 
 var is_linux = "linux" === Process.platform;
 
@@ -157,6 +158,23 @@ function to_type_string(typ) {
   }
 }
 
+function dump_env(ctx) {
+  for(var i = 0 ,i_finish = Belt_List.length(ctx); i < i_finish; ++i){
+    var match = List.nth(ctx, i);
+    var typ_name = to_type_string(match[1]);
+    console.log(match[0].name + " = " + typ_name);
+  }
+}
+
+function dump_constraints(cs) {
+  for(var i = 0 ,i_finish = Belt_List.length(cs); i < i_finish; ++i){
+    var match = List.nth(cs, i);
+    var key = to_type_string(match[0]);
+    var value = to_type_string(match[1]);
+    console.log(key + " = " + value);
+  }
+}
+
 function check_expr(ctx, expr) {
   switch (expr.TAG | 0) {
     case /* CstI */0 :
@@ -179,68 +197,46 @@ function check_expr(ctx, expr) {
                 /* [] */0
               ];
     case /* Let */6 :
-        var match$1 = expr._1;
-        if (match$1.TAG === /* Fn */7) {
-          var params = match$1._0;
-          var ret_type = new_type(undefined);
-          var param_types = Belt_List.map(params, (function (param) {
-                  return new_type(undefined);
-                }));
-          var fn_type = {
-            TAG: /* TFun */1,
-            _0: param_types,
-            _1: ret_type
-          };
-          var ctx$1 = Belt_List.concatMany([
-                {
-                  hd: [
-                    expr._0,
-                    fn_type
-                  ],
-                  tl: Belt_List.zip(params, param_types)
-                },
-                ctx
-              ]);
-          var match$2 = check_expr(ctx$1, match$1._1);
-          var match$3 = check_expr(ctx$1, expr._2);
-          return [
-                  match$3[0],
-                  Belt_List.concatMany([
-                        {
-                          hd: [
-                            ret_type,
-                            match$2[0]
-                          ],
-                          tl: match$2[1]
-                        },
-                        match$3[1]
-                      ])
-                ];
-        }
-        throw {
-              RE_EXN_ID: "Assert_failure",
-              _1: [
-                "Demo.res",
-                179,
-                11
-              ],
-              Error: new Error()
-            };
+        var match$1 = check_expr(ctx, expr._1);
+        var ctx_0 = [
+          expr._0,
+          match$1[0]
+        ];
+        var ctx$1 = {
+          hd: ctx_0,
+          tl: ctx
+        };
+        var match$2 = check_expr(ctx$1, expr._2);
+        return [
+                match$2[0],
+                Belt_List.concatMany([
+                      match$1[1],
+                      match$2[1]
+                    ])
+              ];
     case /* Fn */7 :
-        throw {
-              RE_EXN_ID: "Assert_failure",
-              _1: [
-                "Demo.res",
-                163,
-                18
-              ],
-              Error: new Error()
-            };
+        var params = expr._0;
+        var param_types = Belt_List.map(params, (function (param) {
+                return new_type(undefined);
+              }));
+        var ctx$2 = Belt_List.concatMany([
+              Belt_List.zip(params, param_types),
+              ctx
+            ]);
+        var match$3 = check_expr(ctx$2, expr._1);
+        return [
+                {
+                  TAG: /* TFun */1,
+                  _0: param_types,
+                  _1: match$3[0]
+                },
+                match$3[1]
+              ];
     case /* App */8 :
-        var name$1 = expr._0;
+        var id = expr._0;
         var t = new_type(undefined);
         var match$4 = List.find((function (param) {
-                return param[0].stamp === name$1.stamp;
+                return param[0].stamp === id.stamp;
               }), ctx);
         var match$5 = Belt_List.unzip(Belt_List.map(expr._1, (function (i) {
                     return check_expr(ctx, i);
@@ -255,6 +251,11 @@ function check_expr(ctx, expr) {
           c_0,
           c_1
         ];
+        console.log("==> app: " + to_type_string(t));
+        dump_constraints({
+              hd: c,
+              tl: /* [] */0
+            });
         return [
                 t,
                 {
@@ -310,6 +311,8 @@ function check_expr(ctx, expr) {
           hd: c_0$1,
           tl: c_1$1
         };
+        console.log("==> if: " + to_type_string(t$1));
+        dump_constraints(c$1);
         return [
                 t$1,
                 Belt_List.concatMany([
@@ -344,14 +347,155 @@ function check_expr(ctx, expr) {
   }
 }
 
-function solve(cs) {
-  for(var i = 0 ,i_finish = Belt_List.length(cs); i < i_finish; ++i){
-    var match = List.nth(cs, i);
-    var key = to_type_string(match[0]);
-    var value = to_type_string(match[1]);
-    console.log(key + " = " + value);
+function occurs(typevar, typ) {
+  if (typeof typ === "number") {
+    return false;
+  } else if (typ.TAG === /* TVar */0) {
+    return typ._0 === typevar;
+  } else if (occurs(typevar, typ._1)) {
+    return true;
+  } else {
+    return Belt_List.some(typ._0, (function (t) {
+                  return occurs(typevar, t);
+                }));
   }
-  return /* [] */0;
+}
+
+function replace_type(typevar, typ, cs) {
+  var replace = function (typevar, typ, to_typ) {
+    if (typeof typ === "number") {
+      return typ;
+    }
+    if (typ.TAG === /* TVar */0) {
+      if (typ._0 === typevar) {
+        return to_typ;
+      } else {
+        return typ;
+      }
+    }
+    var arg_types = Belt_List.map(typ._0, (function (t) {
+            return replace(typevar, t, to_typ);
+          }));
+    var ret_type = replace(typevar, typ._1, to_typ);
+    return {
+            TAG: /* TFun */1,
+            _0: arg_types,
+            _1: ret_type
+          };
+  };
+  return Belt_List.map(cs, (function (param) {
+                return [
+                        replace(typevar, param[0], typ),
+                        replace(typevar, param[1], typ)
+                      ];
+              }));
+}
+
+function dump_subst(subst) {
+  console.log("==> subst");
+  for(var i = 0 ,i_finish = Belt_List.length(subst); i < i_finish; ++i){
+    var match = List.nth(subst, i);
+    console.log("    T" + match[0] + " -> " + to_type_string(match[1]));
+  }
+}
+
+function solve(cs) {
+  var go = function (_cs, _s) {
+    while(true) {
+      var s = _s;
+      var cs = _cs;
+      if (!cs) {
+        return s;
+      }
+      var rest = cs.tl;
+      var c = cs.hd;
+      var x;
+      var t;
+      var x$1 = c[0];
+      var exit = 0;
+      if (typeof x$1 === "number") {
+        if (x$1 === /* TInt */0) {
+          if (c[1] === 0) {
+            _cs = rest;
+            continue ;
+          }
+          exit = 2;
+        } else {
+          var match = c[1];
+          if (typeof match === "number") {
+            if (match !== 0) {
+              _cs = rest;
+              continue ;
+            }
+            exit = 2;
+          } else {
+            exit = 2;
+          }
+        }
+      } else if (x$1.TAG === /* TVar */0) {
+        x = x$1._0;
+        t = c[1];
+      } else {
+        var match$1 = c[1];
+        if (typeof match$1 === "number") {
+          exit = 2;
+        } else {
+          if (match$1.TAG === /* TFun */1) {
+            var param_types = Belt_List.zip(x$1._0, match$1._0);
+            _cs = Belt_List.concatMany([
+                  param_types,
+                  {
+                    hd: [
+                      x$1._1,
+                      match$1._1
+                    ],
+                    tl: rest
+                  }
+                ]);
+            continue ;
+          }
+          exit = 2;
+        }
+      }
+      if (exit === 2) {
+        var x$2 = c[1];
+        var exit$1 = 0;
+        if (typeof x$2 === "number" || x$2.TAG !== /* TVar */0) {
+          exit$1 = 3;
+        } else {
+          x = x$2._0;
+          t = x$1;
+        }
+        if (exit$1 === 3) {
+          return Pervasives.failwith("Expected type <" + to_type_string(x$2) + ">, but got <" + to_type_string(x$1) + ">");
+        }
+        
+      }
+      if (occurs(x, t)) {
+        throw {
+              RE_EXN_ID: "Assert_failure",
+              _1: [
+                "Demo.res",
+                265,
+                12
+              ],
+              Error: new Error()
+            };
+      }
+      _s = {
+        hd: [
+          x,
+          t
+        ],
+        tl: s
+      };
+      _cs = replace_type(x, t, rest);
+      continue ;
+    };
+  };
+  var subst = go(cs, /* [] */0);
+  dump_subst(subst);
+  return subst;
 }
 
 var last_id = {
@@ -484,7 +628,12 @@ var Resolve = {
   to_ident_string: to_ident_string,
   new_type: new_type,
   to_type_string: to_type_string,
+  dump_env: dump_env,
+  dump_constraints: dump_constraints,
   check_expr: check_expr,
+  occurs: occurs,
+  replace_type: replace_type,
+  dump_subst: dump_subst,
   solve: solve,
   last_id: last_id,
   new_var_ident: new_var_ident,
@@ -785,7 +934,7 @@ function preprocess(expr) {
                 RE_EXN_ID: "Assert_failure",
                 _1: [
                   "Demo.res",
-                  460,
+                  544,
                   20
                 ],
                 Error: new Error()
@@ -872,15 +1021,7 @@ function compile_expr(expr, env) {
                   tl: /* [] */0
                 };
       case /* CstB */1 :
-          throw {
-                RE_EXN_ID: "Match_failure",
-                _1: [
-                  "Demo.res",
-                  480,
-                  6
-                ],
-                Error: new Error()
-              };
+          return Pervasives.failwith("TODO");
       case /* Add */2 :
           return Belt_List.concatMany([
                       compile_inner(expr._0, env, if_label + 1 | 0),
@@ -918,22 +1059,10 @@ function compile_expr(expr, env) {
                       }
                     ]);
       case /* Var */5 :
-          var name = expr._0;
-          console.log("finding: " + to_ident_string(name));
-          console.log("env: " + Belt_List.reduce(env, "", (function (s, i) {
-                      var tmp;
-                      if (i) {
-                        var ident = i._0;
-                        tmp = ident.name + "/" + String(ident.stamp) + ",";
-                      } else {
-                        tmp = "";
-                      }
-                      return s + tmp;
-                    })));
           return {
                   hd: {
                     TAG: /* Var */1,
-                    _0: find_local_index$1(env, name)
+                    _0: find_local_index$1(env, expr._0)
                   },
                   tl: /* [] */0
                 };
@@ -1296,7 +1425,7 @@ function compile_indexed(expr) {
               RE_EXN_ID: "Match_failure",
               _1: [
                 "Demo.res",
-                627,
+                699,
                 4
               ],
               Error: new Error()
@@ -1864,82 +1993,21 @@ var Native = {
 };
 
 var my_expr = {
-  TAG: /* Let */6,
-  _0: "fib",
-  _1: {
-    TAG: /* Fn */7,
+  TAG: /* Add */2,
+  _0: {
+    TAG: /* Le */9,
     _0: {
-      hd: "n",
-      tl: /* [] */0
+      TAG: /* CstI */0,
+      _0: 1
     },
     _1: {
-      TAG: /* If */10,
-      _0: {
-        TAG: /* Le */9,
-        _0: {
-          TAG: /* Var */5,
-          _0: "n"
-        },
-        _1: {
-          TAG: /* CstI */0,
-          _0: 1
-        }
-      },
-      _1: {
-        TAG: /* CstI */0,
-        _0: 1
-      },
-      _2: {
-        TAG: /* Add */2,
-        _0: {
-          TAG: /* App */8,
-          _0: "fib",
-          _1: {
-            hd: {
-              TAG: /* Sub */3,
-              _0: {
-                TAG: /* Var */5,
-                _0: "n"
-              },
-              _1: {
-                TAG: /* CstI */0,
-                _0: 1
-              }
-            },
-            tl: /* [] */0
-          }
-        },
-        _1: {
-          TAG: /* App */8,
-          _0: "fib",
-          _1: {
-            hd: {
-              TAG: /* Sub */3,
-              _0: {
-                TAG: /* Var */5,
-                _0: "n"
-              },
-              _1: {
-                TAG: /* CstI */0,
-                _0: 2
-              }
-            },
-            tl: /* [] */0
-          }
-        }
-      }
+      TAG: /* CstI */0,
+      _0: 1
     }
   },
-  _2: {
-    TAG: /* App */8,
-    _0: "fib",
-    _1: {
-      hd: {
-        TAG: /* CstI */0,
-        _0: 10
-      },
-      tl: /* [] */0
-    }
+  _1: {
+    TAG: /* CstI */0,
+    _0: 1
   }
 };
 
