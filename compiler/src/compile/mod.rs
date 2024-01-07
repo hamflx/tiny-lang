@@ -1,35 +1,11 @@
-use crate::parser::BinaryOperator;
+use crate::{parser::BinaryOperator, resolution::Expr};
 
-#[derive(Debug, Clone, PartialEq)]
-enum Expr {
-    Id(String),
-    CstI(isize),
-    CstF(f64),
-    CstB(bool),
-    Instant(usize),
-    TimeSpan(usize),
-    Let(Box<LetExpression>),
-    BinaryOperation(Box<BinaryExpression>),
+struct Fun {}
+
+fn compile_impl(expr: Expr) -> Vec<Fun> {
+    todo!()
 }
 
-#[derive(Debug, Clone, PartialEq)]
-struct BinaryExpression {
-    op: BinaryOperator,
-    left: Expr,
-    right: Expr,
+fn compile(expr: Expr) -> Vec<Fun> {
+    compile_impl(expr)
 }
-
-impl BinaryExpression {
-    fn new(op: BinaryOperator, left: Expr, right: Expr) -> Self {
-        Self { op, left, right }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-struct LetExpression {
-    name: String,
-    value: Expr,
-    context: Expr,
-}
-
-fn compile() {}
