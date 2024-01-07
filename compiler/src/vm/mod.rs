@@ -15,6 +15,26 @@ pub(crate) enum Instruction {
     Exit,
 }
 
+impl Instruction {
+    pub(crate) fn code(&self) -> u32 {
+        match self {
+            Instruction::Const => 0,
+            Instruction::Add => 1,
+            Instruction::Mul => 2,
+            Instruction::Var => 3,
+            Instruction::Pop => 4,
+            Instruction::Swap => 5,
+            Instruction::Call => 6,
+            Instruction::Ret => 7,
+            Instruction::Goto => 8,
+            Instruction::IfZero => 9,
+            Instruction::Exit => 10,
+            Instruction::Sub => 11,
+            Instruction::Le => 12,
+        }
+    }
+}
+
 impl TryFrom<u32> for Instruction {
     type Error = &'static str;
 
@@ -38,7 +58,7 @@ impl TryFrom<u32> for Instruction {
     }
 }
 
-struct Vm {
+pub(crate) struct Vm {
     code: Vec<u32>,
     stack: Vec<u32>,
     pc: u32,
@@ -46,7 +66,7 @@ struct Vm {
 }
 
 impl Vm {
-    fn create(code: Vec<u8>) -> Self {
+    pub(crate) fn create(code: Vec<u8>) -> Self {
         let code = code
             .chunks(4)
             .map(|chunk| u32::from_le_bytes(chunk.try_into().unwrap()))
@@ -59,7 +79,7 @@ impl Vm {
         }
     }
 
-    fn start(&mut self) -> u32 {
+    pub(crate) fn start(&mut self) -> u32 {
         loop {
             let instr = self.code[self.pc as usize];
             let instr: Instruction = instr.try_into().unwrap();

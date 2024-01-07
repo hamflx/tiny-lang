@@ -5,7 +5,7 @@ use crate::{
     utils::expression::{app_fn, integer, let_expr, let_fn, op_mul, op_sub, var},
 };
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub(crate) struct Identifier {
     pub(crate) name: String,
     pub(crate) stamp: usize,
@@ -68,7 +68,7 @@ pub(crate) struct LetExpression {
 
 static LAST_IDENTIFIER_STAMP: AtomicUsize = AtomicUsize::new(0);
 
-fn make_identifier(name: String) -> Identifier {
+pub(crate) fn make_identifier(name: String) -> Identifier {
     let stamp = LAST_IDENTIFIER_STAMP.fetch_add(1, Ordering::Relaxed);
     Identifier { name, stamp }
 }
