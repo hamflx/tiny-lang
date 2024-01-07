@@ -7,6 +7,8 @@ pub(crate) enum Token {
     TimeLiteral(String, TimeUnit),
     LParen,
     RParen,
+    LessThan,
+    GreaterThan,
     Plus,
     Minus,
     Mul,
@@ -60,6 +62,8 @@ impl<'c> Tokenizer<'c> {
                 '-' => self.token = Token::Minus,
                 '*' => self.token = Token::Mul,
                 '/' => self.token = Token::Div,
+                '<' => self.token = Token::LessThan,
+                '>' => self.token = Token::GreaterThan,
                 '(' => self.token = Token::LParen,
                 ')' => self.token = Token::RParen,
                 ch if ch.is_ascii_alphabetic() => {

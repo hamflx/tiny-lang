@@ -1,4 +1,7 @@
-use crate::parser::{BinaryExpression, BinaryOperator, Expression, FnExpression, LetExpression};
+use crate::parser::{
+    BinaryExpression, BinaryOperator, Expression, FnExpression, LetExpression, LogicalExpression,
+    LogicalOperator,
+};
 
 pub(crate) fn id(name: String) -> Expression {
     Expression::Var(name)
@@ -45,18 +48,26 @@ pub(crate) fn app_fn(name: &str, args: &[Expression]) -> Expression {
     Expression::App(name.to_string(), args.iter().cloned().collect())
 }
 
+pub(crate) fn op_gt(left: Expression, right: Expression) -> Expression {
+    Expression::Logical(LogicalExpression::new(LogicalOperator::Gt, left, right).into())
+}
+
+pub(crate) fn op_lt(left: Expression, right: Expression) -> Expression {
+    Expression::Logical(LogicalExpression::new(LogicalOperator::Lt, left, right).into())
+}
+
 pub(crate) fn op_add(left: Expression, right: Expression) -> Expression {
     Expression::BinaryOperation(BinaryExpression::new(BinaryOperator::Add, left, right).into())
 }
 
 pub(crate) fn op_sub(left: Expression, right: Expression) -> Expression {
-    Expression::BinaryOperation(BinaryExpression::new(BinaryOperator::Add, left, right).into())
+    Expression::BinaryOperation(BinaryExpression::new(BinaryOperator::Sub, left, right).into())
 }
 
 pub(crate) fn op_mul(left: Expression, right: Expression) -> Expression {
-    Expression::BinaryOperation(BinaryExpression::new(BinaryOperator::Add, left, right).into())
+    Expression::BinaryOperation(BinaryExpression::new(BinaryOperator::Mul, left, right).into())
 }
 
 pub(crate) fn op_div(left: Expression, right: Expression) -> Expression {
-    Expression::BinaryOperation(BinaryExpression::new(BinaryOperator::Add, left, right).into())
+    Expression::BinaryOperation(BinaryExpression::new(BinaryOperator::Div, left, right).into())
 }

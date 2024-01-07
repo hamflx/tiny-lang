@@ -134,6 +134,7 @@ fn compile_impl(expr: &Expression, env: Vec<Identifier>) -> Expr {
             }
             .into(),
         ),
+        Expression::Logical(_) => todo!(),
     }
 }
 

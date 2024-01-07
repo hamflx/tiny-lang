@@ -1,4 +1,7 @@
-use crate::lexer::{TimeUnit, Token, Tokenizer};
+use crate::{
+    lexer::{TimeUnit, Token, Tokenizer},
+    utils::expression::{integer, op_add, op_gt, op_mul, op_sub},
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct LetExpression {
@@ -27,6 +30,7 @@ pub(crate) enum Expression {
     Le(Box<LessEqualExpression>),
     If(Box<IfExpression>),
     BinaryOperation(Box<BinaryExpression>),
+    Logical(Box<LogicalExpression>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -46,6 +50,25 @@ pub(crate) struct BinaryExpression {
 
 impl BinaryExpression {
     pub(crate) fn new(op: BinaryOperator, left: Expression, right: Expression) -> Self {
+        Self { op, left, right }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum LogicalOperator {
+    Lt,
+    Gt,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct LogicalExpression {
+    pub(crate) op: LogicalOperator,
+    pub(crate) left: Expression,
+    pub(crate) right: Expression,
+}
+
+impl LogicalExpression {
+    pub(crate) fn new(op: LogicalOperator, left: Expression, right: Expression) -> Self {
         Self { op, left, right }
     }
 }
@@ -160,7 +183,12 @@ fn parse_term_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
             let expr = BinaryExpression::new(BinaryOperator::Div, left, factor);
             parse_term_(tokenizer, Expression::BinaryOperation(expr.into()))
         }
-        Token::RParen | Token::Plus | Token::Minus | Token::Eof => left,
+        Token::RParen
+        | Token::Plus
+        | Token::Minus
+        | Token::GreaterThan
+        | Token::LessThan
+        | Token::Eof => left,
         token => panic!("invalid token: {:#?}", token),
     }
 }
@@ -175,19 +203,48 @@ fn parse_term(tokenizer: &mut Tokenizer) -> Expression {
     }
 }
 
-fn parse_expression_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
+fn parse_logical_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
     match tokenizer.token() {
         Token::Plus => {
             tokenizer.advance();
             let term = parse_term(tokenizer);
             let expr = BinaryExpression::new(BinaryOperator::Add, left, term);
-            parse_expression_(tokenizer, Expression::BinaryOperation(expr.into()))
+            parse_logical_(tokenizer, Expression::BinaryOperation(expr.into()))
         }
         Token::Minus => {
             tokenizer.advance();
             let term = parse_term(tokenizer);
             let expr = BinaryExpression::new(BinaryOperator::Sub, left, term);
-            parse_expression_(tokenizer, Expression::BinaryOperation(expr.into()))
+            parse_logical_(tokenizer, Expression::BinaryOperation(expr.into()))
+        }
+        Token::RParen | Token::GreaterThan | Token::LessThan | Token::Eof => left,
+        token => panic!("invalid token: {:#?}", token),
+    }
+}
+
+fn parse_logical(tokenizer: &mut Tokenizer) -> Expression {
+    match tokenizer.token() {
+        Token::Id(_) | Token::Num(_) | Token::TimeLiteral(_, _) | Token::Minus | Token::LParen => {
+            let term = parse_term(tokenizer);
+            parse_logical_(tokenizer, term)
+        }
+        token => panic!("invalid token: {:#?}", token),
+    }
+}
+
+fn parse_expression_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
+    match tokenizer.token() {
+        Token::LessThan => {
+            tokenizer.advance();
+            let term = parse_logical(tokenizer);
+            let expr = LogicalExpression::new(LogicalOperator::Lt, left, term);
+            parse_expression_(tokenizer, Expression::Logical(expr.into()))
+        }
+        Token::GreaterThan => {
+            tokenizer.advance();
+            let term = parse_logical(tokenizer);
+            let expr = LogicalExpression::new(LogicalOperator::Gt, left, term);
+            parse_expression_(tokenizer, Expression::Logical(expr.into()))
         }
         Token::RParen | Token::Eof => left,
         token => panic!("invalid token: {:#?}", token),
@@ -197,7 +254,7 @@ fn parse_expression_(tokenizer: &mut Tokenizer, left: Expression) -> Expression 
 fn parse_expression(tokenizer: &mut Tokenizer) -> Expression {
     match tokenizer.token() {
         Token::Id(_) | Token::Num(_) | Token::TimeLiteral(_, _) | Token::Minus | Token::LParen => {
-            let term = parse_term(tokenizer);
+            let term = parse_logical(tokenizer);
             parse_expression_(tokenizer, term)
         }
         token => panic!("invalid token: {:#?}", token),
@@ -223,29 +280,15 @@ pub(crate) fn parse_code(code: &str) -> Expression {
 
 #[test]
 fn test_parser() {
+    parse_code("1 + 2 * (3 - 4) > 3");
     assert_eq!(
-        parse_code("1 + 2 * (3 - 4)"),
-        Expression::BinaryOperation(
-            BinaryExpression::new(
-                BinaryOperator::Add,
-                Expression::CstI(1),
-                Expression::BinaryOperation(
-                    BinaryExpression::new(
-                        BinaryOperator::Mul,
-                        Expression::CstI(2),
-                        Expression::BinaryOperation(
-                            BinaryExpression::new(
-                                BinaryOperator::Sub,
-                                Expression::CstI(3),
-                                Expression::CstI(4)
-                            )
-                            .into()
-                        )
-                    )
-                    .into()
-                )
-            )
-            .into()
+        parse_code("1 + 2 * (3 - 4) > 3"),
+        op_gt(
+            op_add(
+                integer(1),
+                op_mul(integer(2), op_sub(integer(3), integer(4)))
+            ),
+            integer(3)
         )
     );
     assert_eq!(
