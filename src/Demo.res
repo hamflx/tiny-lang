@@ -226,19 +226,38 @@ module Resolve = {
     }
   }
 
-  let replace_type = (typevar: string, typ: typ, cs: constraints): constraints => {
-    let rec replace = (typevar: string, typ: typ, to_typ: typ): typ => {
-      switch typ {
-      | TVar(x) if x == typevar => to_typ
-      | TFun(arg_types, ret_type) => {
-          let arg_types = arg_types->Belt.List.map(t => replace(typevar, t, to_typ))
-          let ret_type = replace(typevar, ret_type, to_typ)
-          TFun(arg_types, ret_type)
-        }
-      | t => t
+  let rec equal_type = (t1: typ, t2: typ): bool => {
+    switch (t1, t2) {
+    | (TBool, TBool)
+    | (TInt, TInt) => true
+    | (TVar(x), TVar(y)) => x == y
+    | (TFun(p1, r1), TFun(p2, r2)) =>
+      Belt.List.zip(p1, p2)->Belt.List.every(((t1, t2)) => equal_type(t1, t2)) && equal_type(r1, r2)
+    | _ => false
+    }
+  }
+
+  let rec replace_type = (typ: typ, matchtype: typ, to_typ: typ): typ => {
+    switch typ {
+    | TFun(arg_types, ret_type) => {
+        let arg_types = arg_types->Belt.List.map(t => replace_type(t, matchtype, to_typ))
+        let ret_type = replace_type(ret_type, matchtype, to_typ)
+        TFun(arg_types, ret_type)
+      }
+    | t =>
+      if equal_type(t, matchtype) {
+        to_typ
+      } else {
+        t
       }
     }
-    cs->Belt.List.map(((t1, t2)) => (replace(typevar, t1, typ), replace(typevar, t2, typ)))
+  }
+
+  let replace_constraints_type = (matchtype: typ, to_typ: typ, cs: constraints): constraints => {
+    cs->Belt.List.map(((t1, t2)) => (
+      replace_type(t1, matchtype, to_typ),
+      replace_type(t2, matchtype, to_typ),
+    ))
   }
 
   let dump_subst = (subst: subst) => {
@@ -263,7 +282,7 @@ module Resolve = {
           }
         | (TVar(x), t) | (t, TVar(x)) => {
             assert !occurs(x, t)
-            go(replace_type(x, t, rest), list{(x, t), ...s})
+            go(replace_constraints_type(TVar(x), t, rest), list{(x, t), ...s})
           }
         | (t1, t2) =>
           failwith(
@@ -275,6 +294,18 @@ module Resolve = {
     let subst = go(cs, list{})
     dump_subst(subst)
     subst
+  }
+
+  let type_subst = (t: typ, s: subst): typ => {
+    s->Belt.List.reduce(t, (t, (typevar, typ)) => {
+      replace_type(t, TVar(typevar), typ)
+    })
+  }
+
+  let infer = (expr: expr): typ => {
+    let (typ, cs) = check_expr(list{}, expr)
+    let subst = solve(cs)
+    type_subst(typ, subst)
   }
 
   let last_id = ref(0)
@@ -632,8 +663,8 @@ module Vm = {
 
   let compile_prog = (expr: Ast.expr): instrs => {
     let expr = Resolve.compile(expr)
-    let (typ, cs) = Resolve.check_expr(list{}, expr)
-    let subst = Resolve.solve(cs)
+    let typ = Resolve.infer(expr)
+    Js.log("program: " ++ Resolve.to_type_string(typ))
     let fns = preprocess(expr)->Belt.List.map(fn => compile_fun(fn))->Belt.List.flatten
     list{Call(ident_main, 0), Exit, ...fns}
   }
@@ -930,7 +961,7 @@ let my_expr = Ast.Let(
 //   Ast.Fn(list{"discount"}, Ast.If(Ast.CstI(1), CstI(1), Ast.Add(CstI(1), CstI(1)))),
 //   Ast.App("calc", list{Ast.CstI(10)}),
 // )
-let my_expr = Ast.Add(Ast.Le(Ast.CstI(1), Ast.CstI(1)), CstI(1))
+// let my_expr = Ast.Add(Ast.Le(Ast.CstI(1), Ast.CstI(1)), CstI(1))
 
 // let my_expr = Ast.Let(
 //   "infer",

@@ -361,32 +361,74 @@ function occurs(typevar, typ) {
   }
 }
 
-function replace_type(typevar, typ, cs) {
-  var replace = function (typevar, typ, to_typ) {
-    if (typeof typ === "number") {
-      return typ;
-    }
-    if (typ.TAG === /* TVar */0) {
-      if (typ._0 === typevar) {
-        return to_typ;
+function equal_type(_t1, _t2) {
+  while(true) {
+    var t2 = _t2;
+    var t1 = _t1;
+    if (typeof t1 === "number") {
+      if (t1 === /* TInt */0) {
+        return t2 === 0;
+      } else if (typeof t2 === "number") {
+        return t2 !== 0;
       } else {
-        return typ;
+        return false;
       }
     }
-    var arg_types = Belt_List.map(typ._0, (function (t) {
-            return replace(typevar, t, to_typ);
-          }));
-    var ret_type = replace(typevar, typ._1, to_typ);
-    return {
-            TAG: /* TFun */1,
-            _0: arg_types,
-            _1: ret_type
-          };
+    if (t1.TAG === /* TVar */0) {
+      if (typeof t2 === "number" || t2.TAG !== /* TVar */0) {
+        return false;
+      } else {
+        return t1._0 === t2._0;
+      }
+    }
+    if (typeof t2 === "number") {
+      return false;
+    }
+    if (t2.TAG !== /* TFun */1) {
+      return false;
+    }
+    if (!Belt_List.every(Belt_List.zip(t1._0, t2._0), (function (param) {
+              return equal_type(param[0], param[1]);
+            }))) {
+      return false;
+    }
+    _t2 = t2._1;
+    _t1 = t1._1;
+    continue ;
   };
+}
+
+function replace_type(typ, matchtype, to_typ) {
+  if (typeof typ === "number") {
+    if (equal_type(typ, matchtype)) {
+      return to_typ;
+    } else {
+      return typ;
+    }
+  }
+  if (typ.TAG !== /* TFun */1) {
+    if (equal_type(typ, matchtype)) {
+      return to_typ;
+    } else {
+      return typ;
+    }
+  }
+  var arg_types = Belt_List.map(typ._0, (function (t) {
+          return replace_type(t, matchtype, to_typ);
+        }));
+  var ret_type = replace_type(typ._1, matchtype, to_typ);
+  return {
+          TAG: /* TFun */1,
+          _0: arg_types,
+          _1: ret_type
+        };
+}
+
+function replace_constraints_type(matchtype, to_typ, cs) {
   return Belt_List.map(cs, (function (param) {
                 return [
-                        replace(typevar, param[0], typ),
-                        replace(typevar, param[1], typ)
+                        replace_type(param[0], matchtype, to_typ),
+                        replace_type(param[1], matchtype, to_typ)
                       ];
               }));
 }
@@ -476,7 +518,7 @@ function solve(cs) {
               RE_EXN_ID: "Assert_failure",
               _1: [
                 "Demo.res",
-                265,
+                284,
                 12
               ],
               Error: new Error()
@@ -489,13 +531,31 @@ function solve(cs) {
         ],
         tl: s
       };
-      _cs = replace_type(x, t, rest);
+      _cs = replace_constraints_type({
+            TAG: /* TVar */0,
+            _0: x
+          }, t, rest);
       continue ;
     };
   };
   var subst = go(cs, /* [] */0);
   dump_subst(subst);
   return subst;
+}
+
+function type_subst(t, s) {
+  return Belt_List.reduce(s, t, (function (t, param) {
+                return replace_type(t, {
+                            TAG: /* TVar */0,
+                            _0: param[0]
+                          }, param[1]);
+              }));
+}
+
+function infer(expr) {
+  var match = check_expr(/* [] */0, expr);
+  var subst = solve(match[1]);
+  return type_subst(match[0], subst);
 }
 
 var last_id = {
@@ -632,9 +692,13 @@ var Resolve = {
   dump_constraints: dump_constraints,
   check_expr: check_expr,
   occurs: occurs,
+  equal_type: equal_type,
   replace_type: replace_type,
+  replace_constraints_type: replace_constraints_type,
   dump_subst: dump_subst,
   solve: solve,
+  type_subst: type_subst,
+  infer: infer,
   last_id: last_id,
   new_var_ident: new_var_ident,
   new_branch_ident: new_branch_ident,
@@ -934,7 +998,7 @@ function preprocess(expr) {
                 RE_EXN_ID: "Assert_failure",
                 _1: [
                   "Demo.res",
-                  544,
+                  575,
                   20
                 ],
                 Error: new Error()
@@ -1193,8 +1257,8 @@ function compile_fun(fun) {
 
 function compile_prog(expr) {
   var expr$1 = compile(expr);
-  var match = check_expr(/* [] */0, expr$1);
-  solve(match[1]);
+  var typ = infer(expr$1);
+  console.log("program: " + to_type_string(typ));
   var fns = Belt_List.flatten(Belt_List.map(preprocess(expr$1), compile_fun));
   return {
           hd: {
@@ -1425,7 +1489,7 @@ function compile_indexed(expr) {
               RE_EXN_ID: "Match_failure",
               _1: [
                 "Demo.res",
-                699,
+                730,
                 4
               ],
               Error: new Error()
@@ -1993,21 +2057,54 @@ var Native = {
 };
 
 var my_expr = {
-  TAG: /* Add */2,
-  _0: {
-    TAG: /* Le */9,
+  TAG: /* Let */6,
+  _0: "calc",
+  _1: {
+    TAG: /* Fn */7,
     _0: {
-      TAG: /* CstI */0,
-      _0: 1
+      hd: "discount",
+      tl: /* [] */0
     },
     _1: {
-      TAG: /* CstI */0,
-      _0: 1
+      TAG: /* If */10,
+      _0: {
+        TAG: /* Le */9,
+        _0: {
+          TAG: /* Var */5,
+          _0: "discount"
+        },
+        _1: {
+          TAG: /* CstI */0,
+          _0: 1
+        }
+      },
+      _1: {
+        TAG: /* CstI */0,
+        _0: 1
+      },
+      _2: {
+        TAG: /* Add */2,
+        _0: {
+          TAG: /* CstI */0,
+          _0: 1
+        },
+        _1: {
+          TAG: /* CstI */0,
+          _0: 1
+        }
+      }
     }
   },
-  _1: {
-    TAG: /* CstI */0,
-    _0: 1
+  _2: {
+    TAG: /* App */8,
+    _0: "calc",
+    _1: {
+      hd: {
+        TAG: /* CstI */0,
+        _0: 10
+      },
+      tl: /* [] */0
+    }
   }
 };
 
