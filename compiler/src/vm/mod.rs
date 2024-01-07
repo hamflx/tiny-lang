@@ -1,5 +1,5 @@
 #[derive(Debug)]
-enum Instruction {
+pub(crate) enum Instruction {
     Const,
     Add,
     Sub,
