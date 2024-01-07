@@ -7,8 +7,8 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Identifier {
-    name: String,
-    stamp: usize,
+    pub(crate) name: String,
+    pub(crate) stamp: usize,
 }
 
 #[derive(Debug, Clone, PartialEq)]
