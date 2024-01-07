@@ -6,7 +6,7 @@ use crate::{
     vm,
 };
 
-fn compile(instrs: Vec<super::Instruction>) -> Vec<u8> {
+pub(crate) fn compile(instrs: Vec<super::Instruction>) -> Vec<u8> {
     let (label_map, _) = instrs
         .iter()
         .fold((HashMap::new(), 0), |(mut map, pos), instr| {

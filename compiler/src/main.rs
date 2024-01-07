@@ -9,6 +9,7 @@ mod vm;
 use std::collections::HashMap;
 
 use parser::{parse_code, BinaryOperator, Expression};
+use vm::Vm;
 
 fn evaluate(expr: &Expression, env: &HashMap<String, isize>) -> isize {
     match expr {
@@ -56,6 +57,21 @@ fn test_evalute() {
     test_evaluate_code!(1 + 2 * 3 / -(5 - 2));
     test_evaluate_code!(2 / 3);
     test_evaluate_code!(8 / 3);
+}
+
+fn compile_to_byte_code(code: &str) -> Vec<u8> {
+    let expr = parse_code(code);
+    let expr = resolution::compile(&expr);
+    let instrs = compile::compile(expr);
+    compile::bytecode::compile(instrs)
+}
+
+#[test]
+fn test_compile_and_run() {
+    let bytecode = compile_to_byte_code("1 + 3 + 5");
+    let mut vm = Vm::create(bytecode);
+    let res = vm.start();
+    assert_eq!(res, 9);
 }
 
 fn main() {

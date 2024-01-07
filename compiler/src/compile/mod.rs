@@ -1,4 +1,4 @@
-mod bytecode;
+pub(crate) mod bytecode;
 
 use crate::{
     parser::BinaryOperator,
@@ -344,7 +344,7 @@ fn compile_fun(fun: Fun) -> Vec<Instruction> {
         .collect()
 }
 
-fn compile(expr: resolution::Expr) -> Vec<Instruction> {
+pub(crate) fn compile(expr: resolution::Expr) -> Vec<Instruction> {
     let (main_expr, fun_list) = extract_fun(expr);
     let main_ident = make_identifier("main".to_string());
     let main_fun = Fun {
