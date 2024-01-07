@@ -1,6 +1,6 @@
 use crate::parser::{
-    BinaryExpression, BinaryOperator, Expression, FnExpression, LetExpression, LogicalExpression,
-    LogicalOperator,
+    BinaryExpression, BinaryOperator, Expression, FnExpression, IfExpression, LetExpression,
+    LogicalExpression, LogicalOperator,
 };
 
 pub(crate) fn id(name: String) -> Expression {
@@ -29,6 +29,17 @@ pub(crate) fn let_expr(name: &str, value: Expression, scope: Expression) -> Expr
             name: name.to_string(),
             scope,
             value,
+        }
+        .into(),
+    )
+}
+
+pub(crate) fn if_expr(cond: Expression, then: Expression, other: Expression) -> Expression {
+    Expression::If(
+        IfExpression {
+            condition: cond,
+            then,
+            other,
         }
         .into(),
     )

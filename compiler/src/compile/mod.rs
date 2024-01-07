@@ -1,7 +1,7 @@
 pub(crate) mod bytecode;
 
 use crate::{
-    parser::BinaryOperator,
+    parser::{BinaryOperator, LogicalOperator},
     resolution::{self, make_identifier, Identifier},
     utils::expression::{app_fn, integer, let_expr, let_fn, op_add, op_mul, op_sub, var},
 };
@@ -26,6 +26,7 @@ pub(crate) enum Expr {
     Le(Box<LessEqualExpression>),
     If(Box<IfExpression>),
     BinaryOperation(Box<BinaryExpression>),
+    LogicalExpression(Box<LogicalExpression>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -37,6 +38,19 @@ pub(crate) struct BinaryExpression {
 
 impl BinaryExpression {
     fn new(op: BinaryOperator, left: Expr, right: Expr) -> Self {
+        Self { op, left, right }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct LogicalExpression {
+    pub(crate) op: LogicalOperator,
+    pub(crate) left: Expr,
+    pub(crate) right: Expr,
+}
+
+impl LogicalExpression {
+    pub(crate) fn new(op: LogicalOperator, left: Expr, right: Expr) -> Self {
         Self { op, left, right }
     }
 }
@@ -158,6 +172,21 @@ fn extract_fun(expr: resolution::Expr) -> (Expr, Vec<Fun>) {
             (
                 Expr::BinaryOperation(
                     BinaryExpression {
+                        op: e.op,
+                        left,
+                        right,
+                    }
+                    .into(),
+                ),
+                funs_left.into_iter().chain(funs_right).collect(),
+            )
+        }
+        resolution::Expr::LogicalExpression(e) => {
+            let (left, funs_left) = extract_fun(e.left);
+            let (right, funs_right) = extract_fun(e.right);
+            (
+                Expr::LogicalExpression(
+                    LogicalExpression {
                         op: e.op,
                         left,
                         right,
@@ -307,8 +336,36 @@ fn compile_expr(expr: Expr, stack: Vec<StackValue>) -> Vec<Instruction> {
                 .chain([Instruction::Call(ident, param_count)])
                 .collect()
         }
-        Expr::Le(_) => todo!(),
-        Expr::If(_) => todo!(),
+        Expr::Le(expr) => {
+            let left_instrs = compile_expr(expr.left, stack.clone());
+            let right_instrs = compile_expr(
+                expr.right,
+                [StackValue::Stmp].into_iter().chain(stack).collect(),
+            );
+            left_instrs
+                .into_iter()
+                .chain(right_instrs)
+                .chain([Instruction::Le])
+                .collect()
+        }
+        Expr::If(expr) => {
+            let cond_instrs = compile_expr(expr.condition, stack.clone());
+            let then_instrs = compile_expr(expr.then, stack.clone());
+            let other_instrs = compile_expr(expr.other, stack);
+            let other_ident = resolution::make_identifier("if_other".to_string());
+            let end_ident = resolution::make_identifier("if_end".to_string());
+            cond_instrs
+                .into_iter()
+                .chain([Instruction::IfZero(other_ident.clone())])
+                .chain(then_instrs)
+                .chain([
+                    Instruction::Goto(end_ident.clone()),
+                    Instruction::Label(other_ident),
+                ])
+                .chain(other_instrs)
+                .chain([Instruction::Label(end_ident)])
+                .collect()
+        }
         Expr::BinaryOperation(expr) => {
             let left_instrs = compile_expr(expr.left, stack.clone());
             let right_instrs = compile_expr(
@@ -320,6 +377,22 @@ fn compile_expr(expr: Expr, stack: Vec<StackValue>) -> Vec<Instruction> {
                 BinaryOperator::Sub => Instruction::Sub,
                 BinaryOperator::Mul => Instruction::Mul,
                 BinaryOperator::Div => todo!(),
+            };
+            left_instrs
+                .into_iter()
+                .chain(right_instrs)
+                .chain([op_instr])
+                .collect()
+        }
+        Expr::LogicalExpression(expr) => {
+            let left_instrs = compile_expr(expr.left, stack.clone());
+            let right_instrs = compile_expr(
+                expr.right,
+                [StackValue::Stmp].into_iter().chain(stack).collect(),
+            );
+            let op_instr = match expr.op {
+                LogicalOperator::Lt => Instruction::Le,
+                LogicalOperator::Gt => todo!(),
             };
             left_instrs
                 .into_iter()

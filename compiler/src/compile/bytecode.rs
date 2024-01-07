@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     resolution,
-    utils::expression::{app_fn, integer, let_expr, let_fn, op_add, var},
+    utils::expression::{app_fn, if_expr, integer, let_expr, let_fn, op_add, op_gt, op_lt, var},
     vm,
 };
 
@@ -74,6 +74,32 @@ fn test_compile() {
     let mut vm = vm::Vm::create(bytecode);
     let result = vm.start();
     assert_eq!(result, 28);
+
+    println!("result: {}", result);
+}
+
+#[test]
+fn test_compile_if_else() {
+    let expr = if_expr(op_lt(integer(3), integer(2)), integer(6), integer(7));
+    let expr = resolution::compile(&expr);
+    let instrs = super::compile(expr);
+    let bytecode = compile(instrs);
+    let mut vm = vm::Vm::create(bytecode);
+    let result = vm.start();
+    assert_eq!(result, 7);
+
+    println!("result: {}", result);
+}
+
+#[test]
+fn test_compile_if_then() {
+    let expr = if_expr(op_lt(integer(3), integer(5)), integer(6), integer(7));
+    let expr = resolution::compile(&expr);
+    let instrs = super::compile(expr);
+    let bytecode = compile(instrs);
+    let mut vm = vm::Vm::create(bytecode);
+    let result = vm.start();
+    assert_eq!(result, 6);
 
     println!("result: {}", result);
 }

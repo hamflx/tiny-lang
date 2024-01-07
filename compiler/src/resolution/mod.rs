@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::{
-    parser::{BinaryOperator, Expression},
+    parser::{BinaryOperator, Expression, LogicalOperator},
     utils::expression::{app_fn, integer, let_expr, let_fn, op_mul, op_sub, var},
 };
 
@@ -25,6 +25,7 @@ pub(crate) enum Expr {
     Le(Box<LessEqualExpression>),
     If(Box<IfExpression>),
     BinaryOperation(Box<BinaryExpression>),
+    LogicalExpression(Box<LogicalExpression>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -36,6 +37,19 @@ pub(crate) struct BinaryExpression {
 
 impl BinaryExpression {
     fn new(op: BinaryOperator, left: Expr, right: Expr) -> Self {
+        Self { op, left, right }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct LogicalExpression {
+    pub(crate) op: LogicalOperator,
+    pub(crate) left: Expr,
+    pub(crate) right: Expr,
+}
+
+impl LogicalExpression {
+    pub(crate) fn new(op: LogicalOperator, left: Expr, right: Expr) -> Self {
         Self { op, left, right }
     }
 }
@@ -134,7 +148,14 @@ fn compile_impl(expr: &Expression, env: Vec<Identifier>) -> Expr {
             }
             .into(),
         ),
-        Expression::Logical(_) => todo!(),
+        Expression::Logical(expr) => Expr::LogicalExpression(
+            LogicalExpression {
+                op: expr.op.clone(),
+                left: compile_impl(&expr.left, env.clone()),
+                right: compile_impl(&expr.right, env.clone()),
+            }
+            .into(),
+        ),
     }
 }
 
