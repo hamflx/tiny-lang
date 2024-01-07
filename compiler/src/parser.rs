@@ -24,6 +24,8 @@ pub(crate) enum Expression {
     Fn(Box<FnExpression>),
     Let(Box<LetExpression>),
     App(String, Vec<Expression>),
+    Le(Box<LessEqualExpression>),
+    If(Box<IfExpression>),
     BinaryOperation(Box<BinaryExpression>),
 }
 
@@ -46,6 +48,19 @@ impl BinaryExpression {
     pub(crate) fn new(op: BinaryOperator, left: Expression, right: Expression) -> Self {
         Self { op, left, right }
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct LessEqualExpression {
+    pub(crate) left: Expression,
+    pub(crate) right: Expression,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct IfExpression {
+    pub(crate) condition: Expression,
+    pub(crate) then: Expression,
+    pub(crate) other: Expression,
 }
 
 fn parse_factor(tokenizer: &mut Tokenizer) -> Expression {

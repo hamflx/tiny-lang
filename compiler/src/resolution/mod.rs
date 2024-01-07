@@ -22,6 +22,8 @@ pub(crate) enum Expr {
     Fn(Box<FnExpression>),
     Let(Box<LetExpression>),
     App(Identifier, Vec<Expr>),
+    Le(Box<LessEqualExpression>),
+    If(Box<IfExpression>),
     BinaryOperation(Box<BinaryExpression>),
 }
 
@@ -36,6 +38,19 @@ impl BinaryExpression {
     fn new(op: BinaryOperator, left: Expr, right: Expr) -> Self {
         Self { op, left, right }
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct LessEqualExpression {
+    pub(crate) left: Expr,
+    pub(crate) right: Expr,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct IfExpression {
+    pub(crate) condition: Expr,
+    pub(crate) then: Expr,
+    pub(crate) other: Expr,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -104,6 +119,21 @@ fn compile_impl(expr: &Expression, env: Vec<Identifier>) -> Expr {
                 args.iter().map(|e| compile_impl(e, env.clone())).collect(),
             )
         }
+        Expression::Le(expr) => Expr::Le(
+            LessEqualExpression {
+                left: compile_impl(&expr.left, env.clone()),
+                right: compile_impl(&expr.right, env.clone()),
+            }
+            .into(),
+        ),
+        Expression::If(expr) => Expr::If(
+            IfExpression {
+                condition: compile_impl(&expr.condition, env.clone()),
+                then: compile_impl(&expr.then, env.clone()),
+                other: compile_impl(&expr.other, env.clone()),
+            }
+            .into(),
+        ),
     }
 }
 
