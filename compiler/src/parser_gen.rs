@@ -16,6 +16,10 @@ fn test_parser() {
             integer(3)
         )
     );
+    assert_eq!(
+        parse_code("if 3 > 2 { 1 } else {0}"),
+        if_expr(op_gt(integer(3), integer(2)), integer(1), integer(0))
+    );
 }
 
 pub(crate) fn parse_code(code: &str) -> Expression {

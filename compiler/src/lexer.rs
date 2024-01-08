@@ -68,6 +68,8 @@ impl<'c> Tokenizer<'c> {
                 '/' => self.token = Token::Div,
                 '<' => self.token = Token::LessThan,
                 '>' => self.token = Token::GreaterThan,
+                '{' => self.token = Token::LBrace,
+                '}' => self.token = Token::RBrace,
                 '(' => self.token = Token::LParen,
                 ')' => self.token = Token::RParen,
                 ch if ch.is_ascii_alphabetic() => {
@@ -78,7 +80,11 @@ impl<'c> Tokenizer<'c> {
                     {
                         ident.push(ch);
                     }
-                    self.token = Token::Id(ident);
+                    self.token = match ident.as_str() {
+                        "if" => Token::If,
+                        "else" => Token::Else,
+                        _ => Token::Id(ident),
+                    };
                 }
                 ch if ch.is_ascii_alphanumeric() => {
                     let mut num_str = String::from(ch);
