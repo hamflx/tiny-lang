@@ -1,6 +1,7 @@
 mod compile;
 mod lexer;
 mod parser;
+mod parser_gen;
 mod resolution;
 mod semantic;
 mod utils;

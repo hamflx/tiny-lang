@@ -7,12 +7,16 @@ pub(crate) enum Token {
     TimeLiteral(String, TimeUnit),
     LParen,
     RParen,
+    LBrace,
+    RBrace,
     LessThan,
     GreaterThan,
     Plus,
     Minus,
     Mul,
     Div,
+    If,
+    Else,
     Eof,
 }
 
