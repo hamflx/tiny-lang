@@ -20,6 +20,13 @@ fn test_parser() {
         parse_code("if 3 > 2 { 1 } else {0}"),
         if_expr(op_gt(integer(3), integer(2)), integer(1), integer(0))
     );
+    assert_eq!(
+        parse_code("5 + if 3 > 2 { 1 } else {0}"),
+        op_add(
+            integer(5),
+            if_expr(op_gt(integer(3), integer(2)), integer(1), integer(0))
+        )
+    );
 }
 
 pub(crate) fn parse_code(code: &str) -> Expression {
