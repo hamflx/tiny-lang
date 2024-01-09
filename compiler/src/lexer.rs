@@ -5,6 +5,7 @@ pub(crate) enum Token {
     Id(String),
     Num(String),
     TimeLiteral(String, TimeUnit),
+    Comma,
     LParen,
     RParen,
     LBrace,
@@ -62,6 +63,7 @@ impl<'c> Tokenizer<'c> {
     pub(crate) fn advance(&mut self) {
         while let Some(ch) = self.code.next() {
             match ch {
+                ',' => self.token = Token::Comma,
                 '+' => self.token = Token::Plus,
                 '-' => self.token = Token::Minus,
                 '*' => self.token = Token::Mul,

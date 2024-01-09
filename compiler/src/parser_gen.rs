@@ -1,7 +1,9 @@
 use crate::{
     lexer::{Token, Tokenizer},
     parser::Expression,
-    utils::expression::{if_expr, integer, op_add, op_div, op_gt, op_lt, op_mul, op_sub, var},
+    utils::expression::{
+        call_expr, if_expr, integer, op_add, op_div, op_gt, op_lt, op_mul, op_sub, var,
+    },
 };
 
 #[test]
@@ -27,6 +29,13 @@ fn test_parser() {
             if_expr(op_gt(integer(3), integer(2)), integer(1), integer(0))
         )
     );
+    assert_eq!(
+        parse_code("log(now() + 5)"),
+        call_expr(
+            "log".into(),
+            vec![op_add(call_expr("now".into(), vec![]), integer(5))]
+        )
+    );
 }
 
 pub(crate) fn parse_code(code: &str) -> Expression {
@@ -34,8 +43,7 @@ pub(crate) fn parse_code(code: &str) -> Expression {
     tokenizer.advance();
     parseP(&mut tokenizer)
 }
-
-fn parseP(tokenizer: &mut Tokenizer) -> Expression {
+pub(crate) fn parseP(tokenizer: &mut Tokenizer) -> Expression {
     match tokenizer.token() {
         Token::LParen | Token::Minus | Token::Id(_) | Token::If | Token::Num(_) => {
             let expr = parseE(tokenizer);
@@ -48,15 +56,15 @@ fn parseP(tokenizer: &mut Tokenizer) -> Expression {
 fn parseE(tokenizer: &mut Tokenizer) -> Expression {
     match tokenizer.token() {
         Token::LParen | Token::Minus | Token::Id(_) | Token::If | Token::Num(_) => {
-            let logical = parseB(tokenizer);
-            parseE_(tokenizer, logical)
+            let left = parseB(tokenizer);
+            parseE_(tokenizer, left)
         }
         tok => panic!("invalid token: {:#?}", tok),
     }
 }
 fn parseE_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
     match tokenizer.token() {
-        Token::Eof | Token::RParen | Token::LBrace | Token::RBrace => left,
+        Token::Eof | Token::RParen | Token::Comma | Token::LBrace | Token::RBrace => left,
         Token::LessThan => {
             tokenizer.eat(Token::LessThan);
             let right = parseB(tokenizer);
@@ -88,6 +96,7 @@ fn parseB_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
         }
         Token::Eof
         | Token::RParen
+        | Token::Comma
         | Token::LBrace
         | Token::RBrace
         | Token::LessThan
@@ -114,6 +123,7 @@ fn parseT_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
         Token::Minus
         | Token::Eof
         | Token::RParen
+        | Token::Comma
         | Token::LBrace
         | Token::RBrace
         | Token::LessThan
@@ -151,9 +161,9 @@ fn parseN(tokenizer: &mut Tokenizer) -> Expression {
             expr
         }
         Token::Id(id) => {
-            let expr = var(id);
+            let id = id.to_string();
             tokenizer.advance();
-            expr
+            parseI(tokenizer, id)
         }
         Token::If => {
             tokenizer.eat(Token::If);
@@ -167,10 +177,62 @@ fn parseN(tokenizer: &mut Tokenizer) -> Expression {
             tokenizer.eat(Token::RBrace);
             if_expr(cond, then, other)
         }
-        Token::Num(num) => {
-            let expr = integer(num.parse().unwrap());
+        Token::Num(n) => {
+            let expr = integer(n.parse().unwrap());
             tokenizer.advance();
             expr
+        }
+        tok => panic!("invalid token: {:#?}", tok),
+    }
+}
+fn parseI(tokenizer: &mut Tokenizer, id: String) -> Expression {
+    match tokenizer.token() {
+        Token::LParen => {
+            tokenizer.eat(Token::LParen);
+            let expr = parseL(tokenizer, id);
+            tokenizer.eat(Token::RParen);
+            expr
+        }
+        Token::Minus
+        | Token::Eof
+        | Token::RParen
+        | Token::Comma
+        | Token::LBrace
+        | Token::RBrace
+        | Token::LessThan
+        | Token::GreaterThan
+        | Token::Plus
+        | Token::Mul
+        | Token::Div => Expression::Var(id),
+        tok => panic!("invalid token: {:#?}", tok),
+    }
+}
+fn parseL(tokenizer: &mut Tokenizer, callee: String) -> Expression {
+    match tokenizer.token() {
+        Token::LParen | Token::Minus | Token::Id(_) | Token::If | Token::Num(_) => {
+            let args = parseM(tokenizer, vec![]);
+            call_expr(callee, args)
+        }
+        Token::RParen => call_expr(callee, vec![]),
+        tok => panic!("invalid token: {:#?}", tok),
+    }
+}
+fn parseM(tokenizer: &mut Tokenizer, left: Vec<Expression>) -> Vec<Expression> {
+    match tokenizer.token() {
+        Token::LParen | Token::Minus | Token::Id(_) | Token::If | Token::Num(_) => {
+            let right = parseE(tokenizer);
+            parseM_(tokenizer, left.into_iter().chain([right]).collect())
+        }
+        tok => panic!("invalid token: {:#?}", tok),
+    }
+}
+fn parseM_(tokenizer: &mut Tokenizer, left: Vec<Expression>) -> Vec<Expression> {
+    match tokenizer.token() {
+        Token::RParen => left,
+        Token::Comma => {
+            tokenizer.eat(Token::Comma);
+            let right = parseE(tokenizer);
+            parseM_(tokenizer, left)
         }
         tok => panic!("invalid token: {:#?}", tok),
     }

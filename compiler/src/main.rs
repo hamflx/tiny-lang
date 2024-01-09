@@ -36,6 +36,7 @@ fn evaluate(expr: &Expression, env: &HashMap<String, isize>) -> isize {
         Expression::Le(_) => todo!(),
         Expression::If(_) => todo!(),
         Expression::Logical(_) => todo!(),
+        Expression::Call(_) => todo!(),
     }
 }
 
@@ -68,12 +69,15 @@ fn compile_to_byte_code(code: &str) -> Vec<u8> {
     compile::bytecode::compile(instrs)
 }
 
+fn compile_and_run(code: &str) -> isize {
+    let bytecode = compile_to_byte_code(code);
+    let mut vm = Vm::create(bytecode);
+    vm.start() as isize
+}
+
 #[test]
 fn test_compile_and_run() {
-    let bytecode = compile_to_byte_code("1 + 3 + 5");
-    let mut vm = Vm::create(bytecode);
-    let res = vm.start();
-    assert_eq!(res, 9);
+    assert_eq!(compile_and_run("1 + 3 + 5"), 9);
 }
 
 fn main() {

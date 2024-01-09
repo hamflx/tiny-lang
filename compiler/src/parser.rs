@@ -1,5 +1,6 @@
 use crate::{
     lexer::{TimeUnit, Token, Tokenizer},
+    parser_gen::parseP,
     utils::expression::{integer, op_add, op_gt, op_mul, op_sub},
 };
 
@@ -29,6 +30,7 @@ pub(crate) enum Expression {
     App(String, Vec<Expression>),
     Le(Box<LessEqualExpression>),
     If(Box<IfExpression>),
+    Call(Box<CallExpression>),
     BinaryOperation(Box<BinaryExpression>),
     Logical(Box<LogicalExpression>),
 }
@@ -84,6 +86,12 @@ pub(crate) struct IfExpression {
     pub(crate) condition: Expression,
     pub(crate) then: Expression,
     pub(crate) other: Expression,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct CallExpression {
+    pub(crate) callee: String,
+    pub(crate) args: Vec<Expression>,
 }
 
 fn parse_factor(tokenizer: &mut Tokenizer) -> Expression {
@@ -275,7 +283,7 @@ fn parse_program(tokenizer: &mut Tokenizer) -> Expression {
 pub(crate) fn parse_code(code: &str) -> Expression {
     let mut tokenizer = Tokenizer::new(code);
     tokenizer.advance();
-    parse_program(&mut tokenizer)
+    parseP(&mut tokenizer)
 }
 
 #[test]
