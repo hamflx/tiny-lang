@@ -35,7 +35,7 @@ pub(crate) fn let_expr(name: &str, value: Expression, scope: Expression) -> Expr
 }
 
 pub(crate) fn call_expr(callee: String, args: Vec<Expression>) -> Expression {
-    Expression::Call(CallExpression { callee, args }.into())
+    Expression::App(callee, args)
 }
 
 pub(crate) fn if_expr(cond: Expression, then: Expression, other: Expression) -> Expression {

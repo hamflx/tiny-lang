@@ -36,7 +36,6 @@ fn evaluate(expr: &Expression, env: &HashMap<String, isize>) -> isize {
         Expression::Le(_) => todo!(),
         Expression::If(_) => todo!(),
         Expression::Logical(_) => todo!(),
-        Expression::Call(_) => todo!(),
     }
 }
 
@@ -78,6 +77,11 @@ fn compile_and_run(code: &str) -> isize {
 #[test]
 fn test_compile_and_run() {
     assert_eq!(compile_and_run("1 + 3 + 5"), 9);
+}
+
+#[test]
+fn test_compile_and_run_now() {
+    assert_eq!(compile_and_run("now() + 1"), 9);
 }
 
 fn main() {

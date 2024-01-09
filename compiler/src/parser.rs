@@ -30,7 +30,6 @@ pub(crate) enum Expression {
     App(String, Vec<Expression>),
     Le(Box<LessEqualExpression>),
     If(Box<IfExpression>),
-    Call(Box<CallExpression>),
     BinaryOperation(Box<BinaryExpression>),
     Logical(Box<LogicalExpression>),
 }

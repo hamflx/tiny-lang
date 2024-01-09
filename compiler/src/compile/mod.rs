@@ -69,6 +69,12 @@ pub(crate) struct IfExpression {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub(crate) struct CallExpression {
+    pub(crate) callee: Identifier,
+    pub(crate) args: Vec<Expr>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct FnExpression {
     pub(crate) params: Vec<Identifier>,
     pub(crate) body: Expr,
