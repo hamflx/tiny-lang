@@ -424,10 +424,6 @@ fn compile_fun(fun: Fun) -> Vec<Instruction> {
         .collect()
 }
 
-pub(crate) fn compile(expr: resolution::Expr) -> Vec<Instruction> {
-    compile_with_builtin_funs(expr, vec![])
-}
-
 pub(crate) fn build_syscall_stub(name: Identifier, no: usize, len: usize) -> Vec<Instruction> {
     [Instruction::Label(name.clone())]
         .into_iter()
@@ -436,10 +432,7 @@ pub(crate) fn build_syscall_stub(name: Identifier, no: usize, len: usize) -> Vec
         .collect()
 }
 
-pub(crate) fn compile_with_builtin_funs(
-    expr: resolution::Expr,
-    funs: Vec<Instruction>,
-) -> Vec<Instruction> {
+pub(crate) fn compile(expr: resolution::Expr) -> Vec<Instruction> {
     let (main_expr, fun_list) = extract_fun(expr);
     let main_ident = make_identifier("main".to_string());
     let main_fun = Fun {
