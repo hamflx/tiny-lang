@@ -85,13 +85,24 @@ fn compile_and_run(code: &str) -> isize {
 }
 
 #[test]
-fn test_compile_and_run() {
-    assert_eq!(compile_and_run("1 + 3 + 5"), 9);
+fn test_compile_and_run_now() {
+    assert_eq!(compile_and_run("now() + 1"), 10087);
 }
 
 #[test]
-fn test_compile_and_run_now() {
-    assert_eq!(compile_and_run("now() + 1"), 10087);
+fn test_compile_and_run() {
+    macro_rules! test_evaluate_code {
+        ($($t:tt)*) => {
+            assert_eq!(compile_and_run(stringify!($($t)*)), $($t)*);
+        };
+    }
+    test_evaluate_code!(1 + 2 * 3);
+    // todo 虚拟机的负数支持。
+    // test_evaluate_code!(1 + 2 * -3);
+    // test_evaluate_code!(1 + 2 - -3);
+    test_evaluate_code!(1 + 2 * 3 - (5 - 2));
+    // test_evaluate_code!(1 + 2 * 3 - -(5 - 2));
+    // test_evaluate_code!(1 + 2 * 3 / -(5 - 2));
 }
 
 fn main() {

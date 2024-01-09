@@ -9,6 +9,13 @@ use crate::{
 #[test]
 fn test_parser() {
     assert_eq!(
+        parse_code("1 + 2 * -3"),
+        op_add(
+            integer(1),
+            op_mul(integer(2), op_sub(integer(0), integer(3)))
+        )
+    );
+    assert_eq!(
         parse_code("1 + 2 * (3 - 4) > 3"),
         op_gt(
             op_add(
@@ -147,7 +154,7 @@ fn parseF(tokenizer: &mut Tokenizer) -> Expression {
         Token::LParen | Token::Id(_) | Token::If | Token::Num(_) => parseN(tokenizer),
         Token::Minus => {
             tokenizer.eat(Token::Minus);
-            parseN(tokenizer)
+            op_sub(integer(0), parseN(tokenizer))
         }
         tok => panic!("invalid token: {:#?}", tok),
     }
