@@ -9,8 +9,10 @@ mod vm;
 
 use std::collections::HashMap;
 
+use compile::build_syscall_stub;
 use parser::{parse_code, BinaryOperator, Expression};
-use vm::Vm;
+use resolution::make_identifier;
+use vm::{SysCall, Vm};
 
 fn evaluate(expr: &Expression, env: &HashMap<String, isize>) -> isize {
     match expr {
@@ -61,16 +63,24 @@ fn test_evalute() {
     test_evaluate_code!(8 / 3);
 }
 
+fn now() -> u32 {
+    return 10086;
+}
+
 fn compile_to_byte_code(code: &str) -> Vec<u8> {
     let expr = parse_code(code);
-    let expr = resolution::compile(&expr);
+    let now_ident = make_identifier("now".to_string());
+    let expr = resolution::compile_with_env(&expr, vec![now_ident.clone()]);
+    let stub = build_syscall_stub(now_ident, 0, 0);
     let instrs = compile::compile(expr);
+    let instrs = instrs.into_iter().chain(stub).collect();
     compile::bytecode::compile(instrs)
 }
 
 fn compile_and_run(code: &str) -> isize {
     let bytecode = compile_to_byte_code(code);
     let mut vm = Vm::create(bytecode);
+    vm.add_sys_call(SysCall::new(now as *const (), 0));
     vm.start() as isize
 }
 
@@ -81,7 +91,7 @@ fn test_compile_and_run() {
 
 #[test]
 fn test_compile_and_run_now() {
-    assert_eq!(compile_and_run("now() + 1"), 9);
+    assert_eq!(compile_and_run("now() + 1"), 10087);
 }
 
 fn main() {

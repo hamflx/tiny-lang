@@ -45,6 +45,9 @@ pub(crate) fn compile(instrs: Vec<super::Instruction>) -> Vec<u8> {
                 let addr = label_map[&ident];
                 instrs.extend([vm::Instruction::Call.code(), addr as u32, len as u32])
             }
+            super::Instruction::SysCall(ident, len) => {
+                instrs.extend([vm::Instruction::SysCall.code(), ident as u32, len as u32])
+            }
         };
         instrs
     });

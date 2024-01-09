@@ -169,6 +169,10 @@ pub(crate) fn compile(expr: &Expression) -> Expr {
     compile_impl(expr, Vec::new())
 }
 
+pub(crate) fn compile_with_env(expr: &Expression, env: Vec<Identifier>) -> Expr {
+    compile_impl(expr, env)
+}
+
 #[test]
 fn test_resolve() {
     let expr = let_expr(

@@ -9,6 +9,7 @@ pub(crate) enum Instruction {
     Pop,
     Swap,
     Call,
+    SysCall,
     Ret,
     Goto,
     IfZero,
@@ -31,6 +32,7 @@ impl Instruction {
             Instruction::Exit => 10,
             Instruction::Sub => 11,
             Instruction::Le => 12,
+            Instruction::SysCall => 13,
         }
     }
 }
@@ -53,8 +55,20 @@ impl TryFrom<u32> for Instruction {
             10 => Ok(Instruction::Exit),
             11 => Ok(Instruction::Sub),
             12 => Ok(Instruction::Le),
+            13 => Ok(Instruction::SysCall),
             _ => Err("invalid instruction"),
         }
+    }
+}
+
+pub(crate) struct SysCall {
+    ptr: *const (),
+    param_count: usize,
+}
+
+impl SysCall {
+    pub(crate) fn new(ptr: *const (), param_count: usize) -> Self {
+        Self { ptr, param_count }
     }
 }
 
@@ -63,6 +77,7 @@ pub(crate) struct Vm {
     stack: Vec<u32>,
     pc: u32,
     sp: u32,
+    syscalls: Vec<SysCall>,
 }
 
 impl Vm {
@@ -76,7 +91,12 @@ impl Vm {
             stack: vec![0; 4096],
             pc: 0,
             sp: 0,
+            syscalls: vec![],
         }
+    }
+
+    pub(crate) fn add_sys_call(&mut self, syscall: SysCall) {
+        self.syscalls.push(syscall);
     }
 
     pub(crate) fn start(&mut self) -> u32 {
@@ -128,6 +148,18 @@ impl Vm {
                     let target = self.code[self.pc as usize + 1];
                     let _ = self.code[self.pc as usize + 2];
                     self.pc = target;
+                }
+                Instruction::SysCall => {
+                    let call_no = self.code[self.pc as usize + 1];
+                    let len = self.code[self.pc as usize + 2];
+                    if len != 0 {
+                        todo!();
+                    }
+                    let syscall = &self.syscalls[call_no as usize];
+                    let f: fn() -> u32 = unsafe { std::mem::transmute(syscall.ptr) };
+                    let result = f();
+                    self.push(result);
+                    self.pc += 3;
                 }
                 Instruction::Ret => {
                     let n = self.code[self.pc as usize + 1];
