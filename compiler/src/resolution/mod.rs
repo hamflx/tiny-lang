@@ -22,7 +22,6 @@ pub(crate) enum Expr {
     Fn(Box<FnExpression>),
     Let(Box<LetExpression>),
     App(Identifier, Vec<Expr>),
-    Le(Box<LessEqualExpression>),
     If(Box<IfExpression>),
     BinaryOperation(Box<BinaryExpression>),
     LogicalExpression(Box<LogicalExpression>),
@@ -139,13 +138,6 @@ fn compile_impl(expr: &Expression, env: Vec<Identifier>) -> Expr {
                 args.iter().map(|e| compile_impl(e, env.clone())).collect(),
             )
         }
-        Expression::Le(expr) => Expr::Le(
-            LessEqualExpression {
-                left: compile_impl(&expr.left, env.clone()),
-                right: compile_impl(&expr.right, env.clone()),
-            }
-            .into(),
-        ),
         Expression::If(expr) => Expr::If(
             IfExpression {
                 condition: compile_impl(&expr.condition, env.clone()),

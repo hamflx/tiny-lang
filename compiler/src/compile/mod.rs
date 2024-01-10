@@ -23,7 +23,6 @@ pub(crate) enum Expr {
     TimeSpan(usize),
     Let(Box<LetExpression>),
     App(Identifier, Vec<Expr>),
-    Le(Box<LessEqualExpression>),
     If(Box<IfExpression>),
     BinaryOperation(Box<BinaryExpression>),
     LogicalExpression(Box<LogicalExpression>),
@@ -143,14 +142,6 @@ fn extract_fun(expr: resolution::Expr) -> (Expr, Vec<Fun>) {
                 },
             );
             (Expr::App(p, args), funs)
-        }
-        resolution::Expr::Le(e) => {
-            let (left, funs_left) = extract_fun(e.left);
-            let (right, funs_right) = extract_fun(e.right);
-            (
-                Expr::Le(LessEqualExpression { left, right }.into()),
-                funs_left.into_iter().chain(funs_right).collect(),
-            )
         }
         resolution::Expr::If(e) => {
             let (condition, funs_cond) = extract_fun(e.condition);
@@ -341,18 +332,6 @@ fn compile_expr(expr: Expr, stack: Vec<StackValue>) -> Vec<Instruction> {
             instrs
                 .into_iter()
                 .chain([Instruction::Call(ident, param_count)])
-                .collect()
-        }
-        Expr::Le(expr) => {
-            let left_instrs = compile_expr(expr.left, stack.clone());
-            let right_instrs = compile_expr(
-                expr.right,
-                [StackValue::Stmp].into_iter().chain(stack).collect(),
-            );
-            left_instrs
-                .into_iter()
-                .chain(right_instrs)
-                .chain([Instruction::Le])
                 .collect()
         }
         Expr::If(expr) => {

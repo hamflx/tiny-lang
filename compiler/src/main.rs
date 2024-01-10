@@ -35,7 +35,6 @@ fn evaluate(expr: &Expression, env: &HashMap<String, isize>) -> isize {
         Expression::TimeSpan(_) => todo!(),
         Expression::Fn(_) => todo!(),
         Expression::App(_, _) => todo!(),
-        Expression::Le(_) => todo!(),
         Expression::If(_) => todo!(),
         Expression::Logical(_) => todo!(),
     }

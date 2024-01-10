@@ -28,7 +28,6 @@ pub(crate) enum Expression {
     Fn(Box<FnExpression>),
     Let(Box<LetExpression>),
     App(String, Vec<Expression>),
-    Le(Box<LessEqualExpression>),
     If(Box<IfExpression>),
     BinaryOperation(Box<BinaryExpression>),
     Logical(Box<LogicalExpression>),
@@ -72,12 +71,6 @@ impl LogicalExpression {
     pub(crate) fn new(op: LogicalOperator, left: Expression, right: Expression) -> Self {
         Self { op, left, right }
     }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct LessEqualExpression {
-    pub(crate) left: Expression,
-    pub(crate) right: Expression,
 }
 
 #[derive(Debug, Clone, PartialEq)]
