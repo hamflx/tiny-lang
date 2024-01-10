@@ -114,6 +114,8 @@ fn test_compile_and_run() {
 
     test_evaluate_code!(if 2 < 4 && 3 > 5 || 5 > 1 { 1 } else { 0 });
 
+    test_evaluate_code!(if 2 < 4 && 3 > 5 || !(5 > 1) { 1 } else { 0 });
+
     // todo 虚拟机的负数支持。
     // test_evaluate_code!(1 + 2 * -3);
     // test_evaluate_code!(1 + 2 - -3);
