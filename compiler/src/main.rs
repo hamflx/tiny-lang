@@ -15,7 +15,7 @@ use resolution::make_identifier;
 use semantic::{check_expr, solve};
 use vm::{SysCall, Vm};
 
-use crate::semantic::apply_subst;
+use crate::semantic::{apply_subst, t_arrow, Typ};
 
 fn evaluate(expr: &Expression, env: &HashMap<String, isize>) -> isize {
     match expr {
@@ -75,7 +75,7 @@ fn compile_to_byte_code(code: &str) -> Vec<u8> {
     let expr = parse_code(code);
     let now_ident = make_identifier("now".to_string());
     let expr = resolution::compile_with_env(&expr, vec![now_ident.clone()]);
-    let (typ, cs) = check_expr(vec![], &expr);
+    let (typ, cs) = check_expr(vec![(now_ident.clone(), t_arrow(Typ::Int, &[]))], &expr);
     let subst = solve(cs);
     let typ = apply_subst(&typ, &subst);
     println!("{}: {:?}", code, typ);

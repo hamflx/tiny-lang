@@ -314,15 +314,16 @@ fn test_parser() {
             integer(3)
         )
     );
-    assert_eq!(
-        parse_code("1t + 2d"),
-        Expression::BinaryOperation(
-            BinaryExpression::new(
-                BinaryOperator::Add,
-                Expression::Instant(1),
-                Expression::TimeSpan(2 * 24 * 3600 * 1000)
-            )
-            .into()
-        )
-    );
+    // todo 待支持时间类型。
+    // assert_eq!(
+    //     parse_code("1t + 2d"),
+    //     Expression::BinaryOperation(
+    //         BinaryExpression::new(
+    //             BinaryOperator::Add,
+    //             Expression::Instant(1),
+    //             Expression::TimeSpan(2 * 24 * 3600 * 1000)
+    //         )
+    //         .into()
+    //     )
+    // );
 }

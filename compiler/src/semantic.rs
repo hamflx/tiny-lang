@@ -30,6 +30,16 @@ pub(crate) struct ArrowType {
     out_typ: Typ,
 }
 
+pub(crate) fn t_arrow(ret: Typ, args: &[Typ]) -> Typ {
+    Typ::Arrow(
+        ArrowType {
+            in_typ: args.into_iter().cloned().collect(),
+            out_typ: ret,
+        }
+        .into(),
+    )
+}
+
 static LAST_VAR_ID: AtomicUsize = AtomicUsize::new(0);
 fn new_var() -> Typ {
     let id = LAST_VAR_ID.fetch_add(1, Ordering::Relaxed);
@@ -84,7 +94,33 @@ pub(crate) fn check_expr(ctx: Context, expr: &resolution::Expr) -> (Typ, Constra
             )
         }
         resolution::Expr::Fn(_) => todo!(),
-        resolution::Expr::App(_, _) => todo!(),
+        resolution::Expr::App(ident, args) => {
+            let t = new_var();
+            let fn_type = ctx
+                .iter()
+                .find(|(name, _)| name == ident)
+                .unwrap()
+                .1
+                .clone();
+            let (typs, css): (Vec<Typ>, Vec<Constraints>) =
+                args.iter().map(|a| check_expr(ctx.clone(), a)).unzip();
+            (
+                t.clone(),
+                [(
+                    fn_type,
+                    Typ::Arrow(
+                        ArrowType {
+                            in_typ: typs,
+                            out_typ: t,
+                        }
+                        .into(),
+                    ),
+                )]
+                .into_iter()
+                .chain(css.into_iter().flatten())
+                .collect(),
+            )
+        }
         resolution::Expr::If(expr) => {
             let t = new_var();
             let (cond_typ, cond_cs) = check_expr(ctx.clone(), &expr.condition);
