@@ -59,7 +59,7 @@ pub(crate) fn parseP(tokenizer: &mut Tokenizer) -> Expression {
             tokenizer.eat(Token::Eof);
             expr
         }
-        tok => panic!("invalid token: {:#?}", tok),
+        tok => panic!("expected `Token::Not`, `Token::LParen`, `Token::Minus`, `Token::Id(_)`, `Token::If`, `Token::Num(_)`, but got {:#?}", tok),
     }
 }
 fn parseE(tokenizer: &mut Tokenizer) -> Expression {
@@ -68,7 +68,7 @@ fn parseE(tokenizer: &mut Tokenizer) -> Expression {
             let left = parseO(tokenizer);
             parseE_(tokenizer, left)
         }
-        tok => panic!("invalid token: {:#?}", tok),
+        tok => panic!("expected `Token::Not`, `Token::LParen`, `Token::Minus`, `Token::Id(_)`, `Token::If`, `Token::Num(_)`, but got {:#?}", tok),
     }
 }
 fn parseE_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
@@ -79,7 +79,7 @@ fn parseE_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
             let right = parseO(tokenizer);
             parseE_(tokenizer, op_or(left, right))
         }
-        tok => panic!("invalid token: {:#?}", tok),
+        tok => panic!("expected `Token::Eof`, `Token::RParen`, `Token::Comma`, `Token::LBrace`, `Token::RBrace`, `Token::Or`, but got {:#?}", tok),
     }
 }
 fn parseO(tokenizer: &mut Tokenizer) -> Expression {
@@ -88,7 +88,7 @@ fn parseO(tokenizer: &mut Tokenizer) -> Expression {
             let left = parseA(tokenizer);
             parseO_(tokenizer, left)
         }
-        tok => panic!("invalid token: {:#?}", tok),
+        tok => panic!("expected `Token::Not`, `Token::LParen`, `Token::Minus`, `Token::Id(_)`, `Token::If`, `Token::Num(_)`, but got {:#?}", tok),
     }
 }
 fn parseO_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
@@ -101,7 +101,7 @@ fn parseO_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
             let right = parseA(tokenizer);
             parseO_(tokenizer, op_and(left, right))
         }
-        tok => panic!("invalid token: {:#?}", tok),
+        tok => panic!("expected `Token::Eof`, `Token::RParen`, `Token::Comma`, `Token::LBrace`, `Token::RBrace`, `Token::Or`, `Token::And`, but got {:#?}", tok),
     }
 }
 fn parseA(tokenizer: &mut Tokenizer) -> Expression {
@@ -110,7 +110,7 @@ fn parseA(tokenizer: &mut Tokenizer) -> Expression {
             let left = parseB(tokenizer);
             parseA_(tokenizer, left)
         }
-        tok => panic!("invalid token: {:#?}", tok),
+        tok => panic!("expected `Token::Not`, `Token::LParen`, `Token::Minus`, `Token::Id(_)`, `Token::If`, `Token::Num(_)`, but got {:#?}", tok),
     }
 }
 fn parseA_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
@@ -142,7 +142,7 @@ fn parseA_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
             let right = parseB(tokenizer);
             parseA_(tokenizer, op_ge(left, right))
         }
-        tok => panic!("invalid token: {:#?}", tok),
+        tok => panic!("expected `Token::Eof`, `Token::RParen`, `Token::Comma`, `Token::LBrace`, `Token::RBrace`, `Token::Or`, `Token::And`, `Token::LessThan`, `Token::LessEqual`, `Token::GreaterThan`, `Token::GreaterEqual`, but got {:#?}", tok),
     }
 }
 fn parseB(tokenizer: &mut Tokenizer) -> Expression {
@@ -151,7 +151,7 @@ fn parseB(tokenizer: &mut Tokenizer) -> Expression {
             let left = parseT(tokenizer);
             parseB_(tokenizer, left)
         }
-        tok => panic!("invalid token: {:#?}", tok),
+        tok => panic!("expected `Token::Not`, `Token::LParen`, `Token::Minus`, `Token::Id(_)`, `Token::If`, `Token::Num(_)`, but got {:#?}", tok),
     }
 }
 fn parseB_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
@@ -177,7 +177,7 @@ fn parseB_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
             let right = parseT(tokenizer);
             parseB_(tokenizer, op_add(left, right))
         }
-        tok => panic!("invalid token: {:#?}", tok),
+        tok => panic!("expected `Token::Minus`, `Token::Eof`, `Token::RParen`, `Token::Comma`, `Token::LBrace`, `Token::RBrace`, `Token::Or`, `Token::And`, `Token::LessThan`, `Token::LessEqual`, `Token::GreaterThan`, `Token::GreaterEqual`, `Token::Plus`, but got {:#?}", tok),
     }
 }
 fn parseT(tokenizer: &mut Tokenizer) -> Expression {
@@ -186,7 +186,7 @@ fn parseT(tokenizer: &mut Tokenizer) -> Expression {
             let left = parseF(tokenizer);
             parseT_(tokenizer, left)
         }
-        tok => panic!("invalid token: {:#?}", tok),
+        tok => panic!("expected `Token::Not`, `Token::LParen`, `Token::Minus`, `Token::Id(_)`, `Token::If`, `Token::Num(_)`, but got {:#?}", tok),
     }
 }
 fn parseT_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
@@ -214,7 +214,7 @@ fn parseT_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
             let right = parseF(tokenizer);
             parseT_(tokenizer, op_div(left, right))
         }
-        tok => panic!("invalid token: {:#?}", tok),
+        tok => panic!("expected `Token::Minus`, `Token::Eof`, `Token::RParen`, `Token::Comma`, `Token::LBrace`, `Token::RBrace`, `Token::Or`, `Token::And`, `Token::LessThan`, `Token::LessEqual`, `Token::GreaterThan`, `Token::GreaterEqual`, `Token::Plus`, `Token::Mul`, `Token::Div`, but got {:#?}", tok),
     }
 }
 fn parseF(tokenizer: &mut Tokenizer) -> Expression {
@@ -228,7 +228,7 @@ fn parseF(tokenizer: &mut Tokenizer) -> Expression {
             tokenizer.eat(Token::Minus);
             op_sub(integer(0), parseN(tokenizer))
         }
-        tok => panic!("invalid token: {:#?}", tok),
+        tok => panic!("expected `Token::Not`, `Token::LParen`, `Token::Id(_)`, `Token::If`, `Token::Num(_)`, `Token::Minus`, but got {:#?}", tok),
     }
 }
 fn parseN(tokenizer: &mut Tokenizer) -> Expression {
@@ -261,7 +261,10 @@ fn parseN(tokenizer: &mut Tokenizer) -> Expression {
             tokenizer.advance();
             expr
         }
-        tok => panic!("invalid token: {:#?}", tok),
+        tok => panic!(
+            "expected `Token::LParen`, `Token::Id(_)`, `Token::If`, `Token::Num(_)`, but got {:#?}",
+            tok
+        ),
     }
 }
 fn parseI(tokenizer: &mut Tokenizer, callee: String) -> Expression {
@@ -287,7 +290,7 @@ fn parseI(tokenizer: &mut Tokenizer, callee: String) -> Expression {
         | Token::Plus
         | Token::Mul
         | Token::Div => Expression::Var(callee),
-        tok => panic!("invalid token: {:#?}", tok),
+        tok => panic!("expected `Token::LParen`, `Token::Minus`, `Token::Eof`, `Token::RParen`, `Token::Comma`, `Token::LBrace`, `Token::RBrace`, `Token::Or`, `Token::And`, `Token::LessThan`, `Token::LessEqual`, `Token::GreaterThan`, `Token::GreaterEqual`, `Token::Plus`, `Token::Mul`, `Token::Div`, but got {:#?}", tok),
     }
 }
 fn parseL(tokenizer: &mut Tokenizer) -> Vec<Expression> {
@@ -296,7 +299,7 @@ fn parseL(tokenizer: &mut Tokenizer) -> Vec<Expression> {
             parseM(tokenizer)
         }
         Token::RParen => Vec::new(),
-        tok => panic!("invalid token: {:#?}", tok),
+        tok => panic!("expected `Token::Not`, `Token::LParen`, `Token::Minus`, `Token::Id(_)`, `Token::If`, `Token::Num(_)`, `Token::RParen`, but got {:#?}", tok),
     }
 }
 fn parseM(tokenizer: &mut Tokenizer) -> Vec<Expression> {
@@ -305,7 +308,7 @@ fn parseM(tokenizer: &mut Tokenizer) -> Vec<Expression> {
             let head = parseE(tokenizer);
             parseM_(tokenizer, vec![head])
         }
-        tok => panic!("invalid token: {:#?}", tok),
+        tok => panic!("expected `Token::Not`, `Token::LParen`, `Token::Minus`, `Token::Id(_)`, `Token::If`, `Token::Num(_)`, but got {:#?}", tok),
     }
 }
 fn parseM_(tokenizer: &mut Tokenizer, args: Vec<Expression>) -> Vec<Expression> {
@@ -316,6 +319,9 @@ fn parseM_(tokenizer: &mut Tokenizer, args: Vec<Expression>) -> Vec<Expression> 
             let item = parseE(tokenizer);
             parseM_(tokenizer, args.into_iter().chain([item]).collect())
         }
-        tok => panic!("invalid token: {:#?}", tok),
+        tok => panic!(
+            "expected `Token::RParen`, `Token::Comma`, but got {:#?}",
+            tok
+        ),
     }
 }
