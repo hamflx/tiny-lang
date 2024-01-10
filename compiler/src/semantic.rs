@@ -15,7 +15,7 @@ type Context = Vec<(resolution::Identifier, Typ)>;
 type Substituation = Vec<(usize, Typ)>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum Typ {
+pub(crate) enum Typ {
     Int,
     Bool,
     Instant,
@@ -25,7 +25,7 @@ enum Typ {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct ArrowType {
+pub(crate) struct ArrowType {
     in_typ: Vec<Typ>,
     out_typ: Typ,
 }
@@ -36,7 +36,20 @@ fn new_var() -> Typ {
     Typ::Var(id)
 }
 
-fn check_expr(ctx: Context, expr: &resolution::Expr) -> (Typ, Constraints) {
+pub(crate) fn solve(cs: Constraints) -> Substituation {
+    sovle_recurse(cs, vec![])
+}
+
+pub(crate) fn apply_subst(typ: &Typ, subst: &Substituation) -> Typ {
+    subst
+        .iter()
+        .fold(typ.clone(), |typ, (find, replace)| {
+            replace_type(&Typ::Var(*find), replace, &typ)
+        })
+        .clone()
+}
+
+pub(crate) fn check_expr(ctx: Context, expr: &resolution::Expr) -> (Typ, Constraints) {
     match expr {
         resolution::Expr::Var(id) => (
             ctx.iter().find(|(name, _)| name == id).unwrap().1.clone(),
@@ -103,8 +116,28 @@ fn check_expr(ctx: Context, expr: &resolution::Expr) -> (Typ, Constraints) {
                     .collect(),
             )
         }
-        resolution::Expr::Logical(_) => todo!(),
-        resolution::Expr::Not(_) => todo!(),
+        resolution::Expr::Logical(expr) => {
+            let (t1, cs1) = check_expr(ctx.clone(), &expr.left);
+            let (t2, cs2) = check_expr(ctx, &expr.right);
+            (
+                Typ::Bool,
+                Vec::from([(t1, Typ::Bool), (t2, Typ::Bool)])
+                    .into_iter()
+                    .chain(cs1.into_iter())
+                    .chain(cs2.into_iter())
+                    .collect(),
+            )
+        }
+        resolution::Expr::Not(expr) => {
+            let (t1, cs1) = check_expr(ctx.clone(), &expr);
+            (
+                Typ::Bool,
+                Vec::from([(t1, Typ::Bool)])
+                    .into_iter()
+                    .chain(cs1.into_iter())
+                    .collect(),
+            )
+        }
     }
 }
 
@@ -239,7 +272,6 @@ fn sovle_recurse(mut cs: Constraints, subst: Substituation) -> Substituation {
             subst,
         ),
         (Typ::Var(x), t) | (t, Typ::Var(x)) => {
-            println!("==> subst: {}={:?}", x, t);
             if occurs(&Typ::Var(x), &t) {
                 panic!("occurs")
             }
@@ -248,10 +280,6 @@ fn sovle_recurse(mut cs: Constraints, subst: Substituation) -> Substituation {
         }
         (t1, t2) => panic!("Type do not match {:?} != {:?}", t1, t2),
     }
-}
-
-fn solve(cs: Constraints) -> Substituation {
-    sovle_recurse(cs, vec![])
 }
 
 fn type_subst(typ: Typ, subst: Substituation) -> Typ {

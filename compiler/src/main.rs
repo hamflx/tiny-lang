@@ -12,7 +12,10 @@ use std::collections::HashMap;
 use compile::build_syscall_stub;
 use parser::{parse_code, BinaryOperator, Expression};
 use resolution::make_identifier;
+use semantic::{check_expr, solve};
 use vm::{SysCall, Vm};
+
+use crate::semantic::apply_subst;
 
 fn evaluate(expr: &Expression, env: &HashMap<String, isize>) -> isize {
     match expr {
@@ -72,6 +75,10 @@ fn compile_to_byte_code(code: &str) -> Vec<u8> {
     let expr = parse_code(code);
     let now_ident = make_identifier("now".to_string());
     let expr = resolution::compile_with_env(&expr, vec![now_ident.clone()]);
+    let (typ, cs) = check_expr(vec![], &expr);
+    let subst = solve(cs);
+    let typ = apply_subst(&typ, &subst);
+    println!("{}: {:?}", code, typ);
     let stub = build_syscall_stub(now_ident, 0, 0);
     let instrs = compile::compile(expr);
     let instrs = instrs.into_iter().chain(stub).collect();
