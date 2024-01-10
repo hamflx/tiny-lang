@@ -12,6 +12,11 @@ pub(crate) enum Token {
     RBrace,
     LessThan,
     GreaterThan,
+    LessEqual,
+    GreaterEqual,
+    Not,
+    Or,
+    And,
     Plus,
     Minus,
     Mul,
@@ -63,13 +68,28 @@ impl<'c> Tokenizer<'c> {
     pub(crate) fn advance(&mut self) {
         while let Some(ch) = self.code.next() {
             match ch {
+                '|' => match self.code.next_if(|ch| *ch == '|') {
+                    Some(_) => self.token = Token::Or,
+                    None => panic!("invalid token: {ch}"),
+                },
+                '&' => match self.code.next_if(|ch| *ch == '&') {
+                    Some(_) => self.token = Token::And,
+                    None => panic!("invalid token: {ch}"),
+                },
+                '!' => self.token = Token::Not,
                 ',' => self.token = Token::Comma,
                 '+' => self.token = Token::Plus,
                 '-' => self.token = Token::Minus,
                 '*' => self.token = Token::Mul,
                 '/' => self.token = Token::Div,
-                '<' => self.token = Token::LessThan,
-                '>' => self.token = Token::GreaterThan,
+                '<' => match self.code.next_if(|ch| *ch == '=') {
+                    Some(_) => self.token = Token::LessEqual,
+                    None => self.token = Token::LessThan,
+                },
+                '>' => match self.code.next_if(|ch| *ch == '=') {
+                    Some(_) => self.token = Token::GreaterEqual,
+                    None => self.token = Token::GreaterThan,
+                },
                 '{' => self.token = Token::LBrace,
                 '}' => self.token = Token::RBrace,
                 '(' => self.token = Token::LParen,

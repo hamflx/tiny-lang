@@ -1,6 +1,6 @@
 use crate::parser::{
-    BinaryExpression, BinaryOperator, CallExpression, Expression, FnExpression, IfExpression,
-    LetExpression, LogicalExpression, LogicalOperator,
+    BinaryExpression, BinaryOperator, CallExpression, ComparisonExpression, ComparisonOperator,
+    Expression, FnExpression, IfExpression, LetExpression, LogicalExpression, LogicalOperator,
 };
 
 pub(crate) fn id(name: String) -> Expression {
@@ -64,11 +64,31 @@ pub(crate) fn app_fn(name: &str, args: &[Expression]) -> Expression {
 }
 
 pub(crate) fn op_gt(left: Expression, right: Expression) -> Expression {
-    Expression::Logical(LogicalExpression::new(LogicalOperator::Gt, left, right).into())
+    Expression::Comparison(ComparisonExpression::new(ComparisonOperator::Gt, left, right).into())
 }
 
 pub(crate) fn op_lt(left: Expression, right: Expression) -> Expression {
-    Expression::Logical(LogicalExpression::new(LogicalOperator::Lt, left, right).into())
+    Expression::Comparison(ComparisonExpression::new(ComparisonOperator::Lt, left, right).into())
+}
+
+pub(crate) fn op_ge(left: Expression, right: Expression) -> Expression {
+    Expression::Comparison(ComparisonExpression::new(ComparisonOperator::Ge, left, right).into())
+}
+
+pub(crate) fn op_le(left: Expression, right: Expression) -> Expression {
+    Expression::Comparison(ComparisonExpression::new(ComparisonOperator::Le, left, right).into())
+}
+
+pub(crate) fn op_and(left: Expression, right: Expression) -> Expression {
+    Expression::Logical(LogicalExpression::new(LogicalOperator::And, left, right).into())
+}
+
+pub(crate) fn op_or(left: Expression, right: Expression) -> Expression {
+    Expression::Logical(LogicalExpression::new(LogicalOperator::Or, left, right).into())
+}
+
+pub(crate) fn op_not(expr: Expression) -> Expression {
+    Expression::Not(expr.into())
 }
 
 pub(crate) fn op_add(left: Expression, right: Expression) -> Expression {

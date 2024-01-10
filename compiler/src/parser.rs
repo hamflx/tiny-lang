@@ -30,7 +30,9 @@ pub(crate) enum Expression {
     App(String, Vec<Expression>),
     If(Box<IfExpression>),
     BinaryOperation(Box<BinaryExpression>),
+    Comparison(Box<ComparisonExpression>),
     Logical(Box<LogicalExpression>),
+    Not(Box<Expression>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -55,9 +57,30 @@ impl BinaryExpression {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum LogicalOperator {
+pub(crate) enum ComparisonOperator {
     Lt,
     Gt,
+    Ge,
+    Le,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum LogicalOperator {
+    And,
+    Or,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct ComparisonExpression {
+    pub(crate) op: ComparisonOperator,
+    pub(crate) left: Expression,
+    pub(crate) right: Expression,
+}
+
+impl ComparisonExpression {
+    pub(crate) fn new(op: ComparisonOperator, left: Expression, right: Expression) -> Self {
+        Self { op, left, right }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -237,14 +260,14 @@ fn parse_expression_(tokenizer: &mut Tokenizer, left: Expression) -> Expression 
         Token::LessThan => {
             tokenizer.advance();
             let term = parse_logical(tokenizer);
-            let expr = LogicalExpression::new(LogicalOperator::Lt, left, term);
-            parse_expression_(tokenizer, Expression::Logical(expr.into()))
+            let expr = ComparisonExpression::new(ComparisonOperator::Lt, left, term);
+            parse_expression_(tokenizer, Expression::Comparison(expr.into()))
         }
         Token::GreaterThan => {
             tokenizer.advance();
             let term = parse_logical(tokenizer);
-            let expr = LogicalExpression::new(LogicalOperator::Gt, left, term);
-            parse_expression_(tokenizer, Expression::Logical(expr.into()))
+            let expr = ComparisonExpression::new(ComparisonOperator::Gt, left, term);
+            parse_expression_(tokenizer, Expression::Comparison(expr.into()))
         }
         Token::RParen | Token::Eof => left,
         token => panic!("invalid token: {:#?}", token),

@@ -2,7 +2,8 @@ use crate::{
     lexer::{Token, Tokenizer},
     parser::Expression,
     utils::expression::{
-        call_expr, if_expr, integer, op_add, op_div, op_gt, op_lt, op_mul, op_sub, var,
+        call_expr, if_expr, integer, op_add, op_and, op_div, op_ge, op_gt, op_le, op_lt, op_mul,
+        op_not, op_or, op_sub, var,
     },
 };
 
@@ -50,9 +51,10 @@ pub(crate) fn parse_code(code: &str) -> Expression {
     tokenizer.advance();
     parseP(&mut tokenizer)
 }
+
 pub(crate) fn parseP(tokenizer: &mut Tokenizer) -> Expression {
     match tokenizer.token() {
-        Token::LParen | Token::Minus | Token::Id(_) | Token::If | Token::Num(_) => {
+        Token::Not | Token::LParen | Token::Minus | Token::Id(_) | Token::If | Token::Num(_) => {
             let expr = parseE(tokenizer);
             tokenizer.eat(Token::Eof);
             expr
@@ -62,8 +64,8 @@ pub(crate) fn parseP(tokenizer: &mut Tokenizer) -> Expression {
 }
 fn parseE(tokenizer: &mut Tokenizer) -> Expression {
     match tokenizer.token() {
-        Token::LParen | Token::Minus | Token::Id(_) | Token::If | Token::Num(_) => {
-            let left = parseB(tokenizer);
+        Token::Not | Token::LParen | Token::Minus | Token::Id(_) | Token::If | Token::Num(_) => {
+            let left = parseO(tokenizer);
             parseE_(tokenizer, left)
         }
         tok => panic!("invalid token: {:#?}", tok),
@@ -72,22 +74,80 @@ fn parseE(tokenizer: &mut Tokenizer) -> Expression {
 fn parseE_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
     match tokenizer.token() {
         Token::Eof | Token::RParen | Token::Comma | Token::LBrace | Token::RBrace => left,
+        Token::Or => {
+            tokenizer.eat(Token::Or);
+            let right = parseO(tokenizer);
+            parseE_(tokenizer, op_or(left, right))
+        }
+        tok => panic!("invalid token: {:#?}", tok),
+    }
+}
+fn parseO(tokenizer: &mut Tokenizer) -> Expression {
+    match tokenizer.token() {
+        Token::Not | Token::LParen | Token::Minus | Token::Id(_) | Token::If | Token::Num(_) => {
+            let left = parseA(tokenizer);
+            parseO_(tokenizer, left)
+        }
+        tok => panic!("invalid token: {:#?}", tok),
+    }
+}
+fn parseO_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
+    match tokenizer.token() {
+        Token::Eof | Token::RParen | Token::Comma | Token::LBrace | Token::RBrace | Token::Or => {
+            left
+        }
+        Token::And => {
+            tokenizer.eat(Token::And);
+            let right = parseA(tokenizer);
+            parseO_(tokenizer, op_and(left, right))
+        }
+        tok => panic!("invalid token: {:#?}", tok),
+    }
+}
+fn parseA(tokenizer: &mut Tokenizer) -> Expression {
+    match tokenizer.token() {
+        Token::Not | Token::LParen | Token::Minus | Token::Id(_) | Token::If | Token::Num(_) => {
+            let left = parseB(tokenizer);
+            parseA_(tokenizer, left)
+        }
+        tok => panic!("invalid token: {:#?}", tok),
+    }
+}
+fn parseA_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
+    match tokenizer.token() {
+        Token::Eof
+        | Token::RParen
+        | Token::Comma
+        | Token::LBrace
+        | Token::RBrace
+        | Token::Or
+        | Token::And => left,
         Token::LessThan => {
             tokenizer.eat(Token::LessThan);
             let right = parseB(tokenizer);
-            parseE_(tokenizer, op_lt(left, right))
+            parseA_(tokenizer, op_lt(left, right))
+        }
+        Token::LessEqual => {
+            tokenizer.eat(Token::LessEqual);
+            let right = parseB(tokenizer);
+            parseA_(tokenizer, op_le(left, right))
         }
         Token::GreaterThan => {
             tokenizer.eat(Token::GreaterThan);
             let right = parseB(tokenizer);
-            parseE_(tokenizer, op_gt(left, right))
+            parseA_(tokenizer, op_gt(left, right))
+        }
+        Token::GreaterEqual => {
+            tokenizer.eat(Token::GreaterEqual);
+            let right = parseB(tokenizer);
+            parseA_(tokenizer, op_ge(left, right))
         }
         tok => panic!("invalid token: {:#?}", tok),
     }
 }
 fn parseB(tokenizer: &mut Tokenizer) -> Expression {
     match tokenizer.token() {
-        Token::LParen | Token::Minus | Token::Id(_) | Token::If | Token::Num(_) => {
+        Token::Not | Token::LParen | Token::Minus | Token::Id(_) | Token::If | Token::Num(_) => {
             let left = parseT(tokenizer);
             parseB_(tokenizer, left)
         }
@@ -106,8 +166,12 @@ fn parseB_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
         | Token::Comma
         | Token::LBrace
         | Token::RBrace
+        | Token::Or
+        | Token::And
         | Token::LessThan
-        | Token::GreaterThan => left,
+        | Token::LessEqual
+        | Token::GreaterThan
+        | Token::GreaterEqual => left,
         Token::Plus => {
             tokenizer.eat(Token::Plus);
             let right = parseT(tokenizer);
@@ -118,7 +182,7 @@ fn parseB_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
 }
 fn parseT(tokenizer: &mut Tokenizer) -> Expression {
     match tokenizer.token() {
-        Token::LParen | Token::Minus | Token::Id(_) | Token::If | Token::Num(_) => {
+        Token::Not | Token::LParen | Token::Minus | Token::Id(_) | Token::If | Token::Num(_) => {
             let left = parseF(tokenizer);
             parseT_(tokenizer, left)
         }
@@ -133,8 +197,12 @@ fn parseT_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
         | Token::Comma
         | Token::LBrace
         | Token::RBrace
+        | Token::Or
+        | Token::And
         | Token::LessThan
+        | Token::LessEqual
         | Token::GreaterThan
+        | Token::GreaterEqual
         | Token::Plus => left,
         Token::Mul => {
             tokenizer.eat(Token::Mul);
@@ -151,6 +219,10 @@ fn parseT_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
 }
 fn parseF(tokenizer: &mut Tokenizer) -> Expression {
     match tokenizer.token() {
+        Token::Not => {
+            tokenizer.eat(Token::Not);
+            op_not(parseN(tokenizer))
+        }
         Token::LParen | Token::Id(_) | Token::If | Token::Num(_) => parseN(tokenizer),
         Token::Minus => {
             tokenizer.eat(Token::Minus);
@@ -192,13 +264,13 @@ fn parseN(tokenizer: &mut Tokenizer) -> Expression {
         tok => panic!("invalid token: {:#?}", tok),
     }
 }
-fn parseI(tokenizer: &mut Tokenizer, id: String) -> Expression {
+fn parseI(tokenizer: &mut Tokenizer, callee: String) -> Expression {
     match tokenizer.token() {
         Token::LParen => {
             tokenizer.eat(Token::LParen);
-            let expr = parseL(tokenizer, id);
+            let args = parseL(tokenizer);
             tokenizer.eat(Token::RParen);
-            expr
+            call_expr(callee, args)
         }
         Token::Minus
         | Token::Eof
@@ -206,40 +278,43 @@ fn parseI(tokenizer: &mut Tokenizer, id: String) -> Expression {
         | Token::Comma
         | Token::LBrace
         | Token::RBrace
+        | Token::Or
+        | Token::And
         | Token::LessThan
+        | Token::LessEqual
         | Token::GreaterThan
+        | Token::GreaterEqual
         | Token::Plus
         | Token::Mul
-        | Token::Div => Expression::Var(id),
+        | Token::Div => Expression::Var(callee),
         tok => panic!("invalid token: {:#?}", tok),
     }
 }
-fn parseL(tokenizer: &mut Tokenizer, callee: String) -> Expression {
+fn parseL(tokenizer: &mut Tokenizer) -> Vec<Expression> {
     match tokenizer.token() {
-        Token::LParen | Token::Minus | Token::Id(_) | Token::If | Token::Num(_) => {
-            let args = parseM(tokenizer, vec![]);
-            call_expr(callee, args)
+        Token::Not | Token::LParen | Token::Minus | Token::Id(_) | Token::If | Token::Num(_) => {
+            parseM(tokenizer)
         }
-        Token::RParen => call_expr(callee, vec![]),
+        Token::RParen => Vec::new(),
         tok => panic!("invalid token: {:#?}", tok),
     }
 }
-fn parseM(tokenizer: &mut Tokenizer, left: Vec<Expression>) -> Vec<Expression> {
+fn parseM(tokenizer: &mut Tokenizer) -> Vec<Expression> {
     match tokenizer.token() {
-        Token::LParen | Token::Minus | Token::Id(_) | Token::If | Token::Num(_) => {
-            let right = parseE(tokenizer);
-            parseM_(tokenizer, left.into_iter().chain([right]).collect())
+        Token::Not | Token::LParen | Token::Minus | Token::Id(_) | Token::If | Token::Num(_) => {
+            let head = parseE(tokenizer);
+            parseM_(tokenizer, vec![head])
         }
         tok => panic!("invalid token: {:#?}", tok),
     }
 }
-fn parseM_(tokenizer: &mut Tokenizer, left: Vec<Expression>) -> Vec<Expression> {
+fn parseM_(tokenizer: &mut Tokenizer, args: Vec<Expression>) -> Vec<Expression> {
     match tokenizer.token() {
-        Token::RParen => left,
+        Token::RParen => args,
         Token::Comma => {
             tokenizer.eat(Token::Comma);
-            let right = parseE(tokenizer);
-            parseM_(tokenizer, left)
+            let item = parseE(tokenizer);
+            parseM_(tokenizer, args.into_iter().chain([item]).collect())
         }
         tok => panic!("invalid token: {:#?}", tok),
     }

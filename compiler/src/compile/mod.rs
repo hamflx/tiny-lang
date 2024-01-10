@@ -1,7 +1,7 @@
 pub(crate) mod bytecode;
 
 use crate::{
-    parser::{BinaryOperator, LogicalOperator},
+    parser::{BinaryOperator, ComparisonOperator, LogicalOperator},
     resolution::{self, make_identifier, Identifier},
     utils::expression::{app_fn, integer, let_expr, let_fn, op_add, op_mul, op_sub, var},
 };
@@ -25,7 +25,9 @@ pub(crate) enum Expr {
     App(Identifier, Vec<Expr>),
     If(Box<IfExpression>),
     BinaryOperation(Box<BinaryExpression>),
-    LogicalExpression(Box<LogicalExpression>),
+    ComparisonExpression(Box<ComparisonExpression>),
+    Logical(Box<LogicalExpression>),
+    Not(Box<Expr>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -37,6 +39,19 @@ pub(crate) struct BinaryExpression {
 
 impl BinaryExpression {
     fn new(op: BinaryOperator, left: Expr, right: Expr) -> Self {
+        Self { op, left, right }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct ComparisonExpression {
+    pub(crate) op: ComparisonOperator,
+    pub(crate) left: Expr,
+    pub(crate) right: Expr,
+}
+
+impl ComparisonExpression {
+    pub(crate) fn new(op: ComparisonOperator, left: Expr, right: Expr) -> Self {
         Self { op, left, right }
     }
 }
@@ -178,12 +193,12 @@ fn extract_fun(expr: resolution::Expr) -> (Expr, Vec<Fun>) {
                 funs_left.into_iter().chain(funs_right).collect(),
             )
         }
-        resolution::Expr::LogicalExpression(e) => {
+        resolution::Expr::Comparison(e) => {
             let (left, funs_left) = extract_fun(e.left);
             let (right, funs_right) = extract_fun(e.right);
             (
-                Expr::LogicalExpression(
-                    LogicalExpression {
+                Expr::ComparisonExpression(
+                    ComparisonExpression {
                         op: e.op,
                         left,
                         right,
@@ -192,6 +207,25 @@ fn extract_fun(expr: resolution::Expr) -> (Expr, Vec<Fun>) {
                 ),
                 funs_left.into_iter().chain(funs_right).collect(),
             )
+        }
+        resolution::Expr::Logical(expr) => {
+            let (left, funs_left) = extract_fun(expr.left);
+            let (right, funs_right) = extract_fun(expr.right);
+            (
+                Expr::Logical(
+                    LogicalExpression {
+                        op: expr.op,
+                        left,
+                        right,
+                    }
+                    .into(),
+                ),
+                funs_left.into_iter().chain(funs_right).collect(),
+            )
+        }
+        resolution::Expr::Not(expr) => {
+            let (expr, funs) = extract_fun(*expr);
+            (Expr::Not(expr.into()), funs)
         }
     }
 }
@@ -253,7 +287,13 @@ pub(crate) enum Instruction {
     Add,
     Sub,
     Mul,
+    Gt,
+    Lt,
+    Ge,
     Le,
+    And,
+    Or,
+    Not,
     Var(usize),
     Pop,
     Swap,
@@ -275,6 +315,12 @@ impl Instruction {
             | Instruction::IfZero(_)
             | Instruction::Goto(_) => 2,
             Instruction::Le
+            | Instruction::Lt
+            | Instruction::Ge
+            | Instruction::Gt
+            | Instruction::And
+            | Instruction::Or
+            | Instruction::Not
             | Instruction::Add
             | Instruction::Sub
             | Instruction::Mul
@@ -370,21 +416,43 @@ fn compile_expr(expr: Expr, stack: Vec<StackValue>) -> Vec<Instruction> {
                 .chain([op_instr])
                 .collect()
         }
-        Expr::LogicalExpression(expr) => {
+        Expr::ComparisonExpression(expr) => {
             let left_instrs = compile_expr(expr.left, stack.clone());
             let right_instrs = compile_expr(
                 expr.right,
                 [StackValue::Stmp].into_iter().chain(stack).collect(),
             );
             let op_instr = match expr.op {
-                LogicalOperator::Lt => Instruction::Le,
-                LogicalOperator::Gt => todo!(),
+                ComparisonOperator::Lt => Instruction::Lt,
+                ComparisonOperator::Gt => Instruction::Gt,
+                ComparisonOperator::Ge => Instruction::Ge,
+                ComparisonOperator::Le => Instruction::Le,
             };
             left_instrs
                 .into_iter()
                 .chain(right_instrs)
                 .chain([op_instr])
                 .collect()
+        }
+        Expr::Logical(expr) => {
+            let left_instrs = compile_expr(expr.left, stack.clone());
+            let right_instrs = compile_expr(
+                expr.right,
+                [StackValue::Stmp].into_iter().chain(stack).collect(),
+            );
+            let op_instr = match expr.op {
+                LogicalOperator::And => Instruction::And,
+                LogicalOperator::Or => Instruction::Or,
+            };
+            left_instrs
+                .into_iter()
+                .chain(right_instrs)
+                .chain([op_instr])
+                .collect()
+        }
+        Expr::Not(expr) => {
+            let instrs = compile_expr(*expr, stack);
+            instrs.into_iter().chain([Instruction::Not]).collect()
         }
     }
 }

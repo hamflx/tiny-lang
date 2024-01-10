@@ -91,7 +91,7 @@ fn check_expr(ctx: Context, expr: &resolution::Expr) -> (Typ, Constraints) {
                 .collect(),
             )
         }
-        resolution::Expr::LogicalExpression(expr) => {
+        resolution::Expr::Comparison(expr) => {
             let (t1, cs1) = check_expr(ctx.clone(), &expr.left);
             let (t2, cs2) = check_expr(ctx, &expr.right);
             (
@@ -103,6 +103,8 @@ fn check_expr(ctx: Context, expr: &resolution::Expr) -> (Typ, Constraints) {
                     .collect(),
             )
         }
+        resolution::Expr::Logical(_) => todo!(),
+        resolution::Expr::Not(_) => todo!(),
     }
 }
 

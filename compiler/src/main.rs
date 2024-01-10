@@ -36,7 +36,9 @@ fn evaluate(expr: &Expression, env: &HashMap<String, isize>) -> isize {
         Expression::Fn(_) => todo!(),
         Expression::App(_, _) => todo!(),
         Expression::If(_) => todo!(),
+        Expression::Comparison(_) => todo!(),
         Expression::Logical(_) => todo!(),
+        Expression::Not(_) => todo!(),
     }
 }
 
@@ -96,6 +98,22 @@ fn test_compile_and_run() {
         };
     }
     test_evaluate_code!(1 + 2 * 3);
+    test_evaluate_code!(if 5 > 2 { 1 } else { 0 });
+    test_evaluate_code!(if 2 > 2 { 1 } else { 0 });
+    test_evaluate_code!(if 2 >= 2 { 1 } else { 0 });
+    test_evaluate_code!(if 2 >= 4 { 1 } else { 0 });
+
+    test_evaluate_code!(if 5 < 2 { 1 } else { 0 });
+    test_evaluate_code!(if 2 < 2 { 1 } else { 0 });
+    test_evaluate_code!(if 2 <= 2 { 1 } else { 0 });
+    test_evaluate_code!(if 2 <= 4 { 1 } else { 0 });
+    test_evaluate_code!(if 2 < 4 { 1 } else { 0 });
+
+    test_evaluate_code!(if 2 < 4 && 3 > 2 { 1 } else { 0 });
+    test_evaluate_code!(if 2 < 4 && 3 > 5 { 1 } else { 0 });
+
+    test_evaluate_code!(if 2 < 4 && 3 > 5 || 5 > 1 { 1 } else { 0 });
+
     // todo 虚拟机的负数支持。
     // test_evaluate_code!(1 + 2 * -3);
     // test_evaluate_code!(1 + 2 - -3);
@@ -107,7 +125,7 @@ fn test_compile_and_run() {
 fn main() {
     for line in std::io::stdin().lines() {
         let line = line.unwrap();
-        let result = evaluate_code(&line);
+        let result = compile_and_run(&line);
         println!("={result}");
     }
 }

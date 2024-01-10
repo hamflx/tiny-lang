@@ -5,6 +5,12 @@ pub(crate) enum Instruction {
     Sub,
     Mul,
     Le,
+    Ge,
+    Lt,
+    Gt,
+    And,
+    Or,
+    Not,
     Var,
     Pop,
     Swap,
@@ -33,6 +39,12 @@ impl Instruction {
             Instruction::Sub => 11,
             Instruction::Le => 12,
             Instruction::SysCall => 13,
+            Instruction::Ge => 14,
+            Instruction::Lt => 15,
+            Instruction::Gt => 16,
+            Instruction::And => 17,
+            Instruction::Or => 18,
+            Instruction::Not => 19,
         }
     }
 }
@@ -56,6 +68,12 @@ impl TryFrom<u32> for Instruction {
             11 => Ok(Instruction::Sub),
             12 => Ok(Instruction::Le),
             13 => Ok(Instruction::SysCall),
+            14 => Ok(Instruction::Ge),
+            15 => Ok(Instruction::Lt),
+            16 => Ok(Instruction::Gt),
+            17 => Ok(Instruction::And),
+            18 => Ok(Instruction::Or),
+            19 => Ok(Instruction::Not),
             _ => Err("invalid instruction"),
         }
     }
@@ -199,6 +217,41 @@ impl Vm {
                     let b = self.pop();
                     let a = self.pop();
                     self.push((a <= b) as u32);
+                    self.pc += 1;
+                }
+                Instruction::Ge => {
+                    let b = self.pop();
+                    let a = self.pop();
+                    self.push((a >= b) as u32);
+                    self.pc += 1;
+                }
+                Instruction::Lt => {
+                    let b = self.pop();
+                    let a = self.pop();
+                    self.push((a < b) as u32);
+                    self.pc += 1;
+                }
+                Instruction::Gt => {
+                    let b = self.pop();
+                    let a = self.pop();
+                    self.push((a > b) as u32);
+                    self.pc += 1;
+                }
+                Instruction::And => {
+                    let b = self.pop() != 0;
+                    let a = self.pop() != 0;
+                    self.push((a && b) as u32);
+                    self.pc += 1;
+                }
+                Instruction::Or => {
+                    let b = self.pop() != 0;
+                    let a = self.pop() != 0;
+                    self.push((a || b) as u32);
+                    self.pc += 1;
+                }
+                Instruction::Not => {
+                    let a = self.pop() != 0;
+                    self.push(!a as u32);
                     self.pc += 1;
                 }
             }
