@@ -296,6 +296,7 @@ fn test_compile_and_run_now() {
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
                 .as_secs() as isize)
+            .abs()
             < 2
     );
 }
