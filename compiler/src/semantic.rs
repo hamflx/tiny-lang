@@ -24,6 +24,19 @@ pub(crate) enum Typ {
     Arrow(Box<ArrowType>),
 }
 
+impl Typ {
+    pub fn arg_len(&self) -> Option<usize> {
+        match self {
+            Typ::Int => None,
+            Typ::Bool => None,
+            Typ::Instant => None,
+            Typ::Duration => None,
+            Typ::Var(_) => None,
+            Typ::Arrow(arrow) => Some(arrow.in_typ.len()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ArrowType {
     in_typ: Vec<Typ>,

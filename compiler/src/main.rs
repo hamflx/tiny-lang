@@ -88,6 +88,18 @@ struct SysVariableTableRecord {
     typ: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SysCallTable {
+    rows: Vec<SysCallTableRecord>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SysCallTableRecord {
+    ptr: *const (),
+    id: Identifier,
+    typ: Typ,
+}
+
 fn replace_var_with_call(
     expr: resolution::Expr,
     get_ident: Identifier,
@@ -161,10 +173,9 @@ fn replace_var_with_call(
     }
 }
 
-fn compile_to_byte_code(code: &str) -> Vec<u8> {
+fn compile_to_byte_code(code: &str, sys_calls: &SysCallTable, get_index: usize) -> Vec<u8> {
     let expr = parse_code(code);
-    let now_ident = make_identifier("now".to_string());
-    let get_var_ident = make_identifier("get".to_string());
+    let get_var_record = &sys_calls.rows[get_index];
     let age_ident = make_identifier("age".to_string());
     let sys_vars = SysVariableTable {
         rows: vec![SysVariableTableRecord {
@@ -175,39 +186,62 @@ fn compile_to_byte_code(code: &str) -> Vec<u8> {
     };
     let expr = resolution::compile_with_env(
         &expr,
-        vec![now_ident.clone(), get_var_ident.clone()]
-            .into_iter()
+        sys_calls
+            .rows
+            .iter()
+            .map(|r| r.id.clone())
             .chain(sys_vars.rows.iter().map(|r| r.id.clone()))
             .collect(),
     );
-    let expr = replace_var_with_call(expr, get_var_ident.clone(), &sys_vars);
+    let expr = replace_var_with_call(expr, get_var_record.id.clone(), &sys_vars);
     let (typ, cs) = check_expr(
-        vec![
-            (now_ident.clone(), t_arrow(Typ::Int, &[])),
-            (
-                get_var_ident.clone(),
-                t_arrow(Typ::Int, &[Typ::Int, Typ::Int]),
-            ),
-        ],
+        sys_calls
+            .rows
+            .iter()
+            .map(|r| (r.id.clone(), r.typ.clone()))
+            .collect(),
         &expr,
     );
     let subst = solve(cs);
     let typ = apply_subst(&typ, &subst);
     println!("{}: {:?}", code, typ);
-    let stub: Vec<_> = build_syscall_stub(now_ident, 0, 0)
-        .into_iter()
-        .chain(build_syscall_stub(get_var_ident, 1, 2))
+    let stub: Vec<_> = sys_calls
+        .rows
+        .iter()
+        .enumerate()
+        .map(|(i, r)| build_syscall_stub(r.id.clone(), i, r.typ.arg_len().unwrap()))
+        .flatten()
         .collect();
     let instrs = compile::compile(expr);
     let instrs = instrs.into_iter().chain(stub).collect();
     compile::bytecode::compile(instrs)
 }
 
+fn build_sys_calls_table() -> SysCallTable {
+    SysCallTable {
+        rows: vec![
+            SysCallTableRecord {
+                ptr: get_sys_var as *const (),
+                id: make_identifier("get".to_string()),
+                typ: t_arrow(Typ::Int, &[Typ::Int, Typ::Int]),
+            },
+            SysCallTableRecord {
+                ptr: now as *const (),
+                id: make_identifier("now".to_string()),
+                typ: t_arrow(Typ::Int, &[]),
+            },
+        ],
+    }
+}
+
 fn compile_and_run(code: &str) -> isize {
-    let bytecode = compile_to_byte_code(code);
+    let sys_calls = build_sys_calls_table();
+    let bytecode = compile_to_byte_code(code, &sys_calls, 0);
     let mut vm = Vm::create(bytecode);
-    vm.add_sys_call(SysCall::new(now as *const (), 0));
-    vm.add_sys_call(SysCall::new(get_sys_var as *const (), 2));
+    for SysCallTableRecord { ptr, typ, .. } in sys_calls.rows {
+        vm.add_sys_call(SysCall::new(ptr, typ.arg_len().unwrap()));
+        vm.add_sys_call(SysCall::new(ptr, typ.arg_len().unwrap()));
+    }
     vm.start() as isize
 }
 
