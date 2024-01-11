@@ -7,7 +7,10 @@ mod semantic;
 mod utils;
 mod vm;
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use ast::{BinaryOperator, Expression};
 use compile::build_syscall_stub;
@@ -224,7 +227,10 @@ impl std::fmt::Debug for SysCallGetContext {
 
 fn build_default_sys_calls(get_var: impl Fn(u32, u32) -> u32 + 'static) -> SysCallTable {
     fn now(_: &SysCall) -> u32 {
-        return 10086;
+        return SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as _;
     }
 
     fn get_sys_var(sys_call: &SysCall, no: u32, typ: u32) -> u32 {
@@ -284,7 +290,14 @@ fn compile_and_run_with_vars(code: &str, vars: &[(&str, u32)]) -> isize {
 
 #[test]
 fn test_compile_and_run_now() {
-    assert_eq!(compile_and_run("now() + 1"), 10087);
+    assert_eq!(
+        compile_and_run("now() + 1") / 10,
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as isize
+            / 10
+    );
 }
 
 #[test]
