@@ -18,7 +18,6 @@ fn test_generate_shellcode() {
     let mem = mem.make_exec().unwrap();
     let exe_fn: ExeCodeFn = unsafe { std::mem::transmute(mem.as_ptr()) };
     let value = exe_fn();
-    std::fs::write("machine_code.bin", bytes).unwrap();
     println!("==> value is: {}", value);
 }
 
