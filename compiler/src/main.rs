@@ -173,17 +173,14 @@ fn replace_var_with_call(
     }
 }
 
-fn compile_to_byte_code(code: &str, sys_calls: &SysCallTable, get_index: usize) -> Vec<u8> {
+fn compile_to_byte_code(
+    code: &str,
+    sys_calls: &SysCallTable,
+    sys_vars: &SysVariableTable,
+    get_index: usize,
+) -> Vec<u8> {
     let expr = parse_code(code);
     let get_var_record = &sys_calls.rows[get_index];
-    let age_ident = make_identifier("age".to_string());
-    let sys_vars = SysVariableTable {
-        rows: vec![SysVariableTableRecord {
-            id: age_ident,
-            no: 0,
-            typ: 1,
-        }],
-    };
     let expr = resolution::compile_with_env(
         &expr,
         sys_calls
@@ -217,7 +214,7 @@ fn compile_to_byte_code(code: &str, sys_calls: &SysCallTable, get_index: usize) 
     compile::bytecode::compile(instrs)
 }
 
-fn build_sys_calls_table() -> SysCallTable {
+fn build_default_sys_calls() -> SysCallTable {
     SysCallTable {
         rows: vec![
             SysCallTableRecord {
@@ -234,12 +231,22 @@ fn build_sys_calls_table() -> SysCallTable {
     }
 }
 
+fn build_default_sys_vars() -> SysVariableTable {
+    SysVariableTable {
+        rows: vec![SysVariableTableRecord {
+            id: make_identifier("age".to_string()),
+            no: 0,
+            typ: 1,
+        }],
+    }
+}
+
 fn compile_and_run(code: &str) -> isize {
-    let sys_calls = build_sys_calls_table();
-    let bytecode = compile_to_byte_code(code, &sys_calls, 0);
+    let sys_calls = build_default_sys_calls();
+    let sys_vars = build_default_sys_vars();
+    let bytecode = compile_to_byte_code(code, &sys_calls, &sys_vars, 0);
     let mut vm = Vm::create(bytecode);
     for SysCallTableRecord { ptr, typ, .. } in sys_calls.rows {
-        vm.add_sys_call(SysCall::new(ptr, typ.arg_len().unwrap()));
         vm.add_sys_call(SysCall::new(ptr, typ.arg_len().unwrap()));
     }
     vm.start() as isize
