@@ -7,9 +7,8 @@ use crate::{compile, parser_gen::parse_code, resolution};
 
 type ExeCodeFn = extern "system" fn() -> usize;
 
-#[test]
-fn test_generate_shellcode() {
-    let expr = parse_code("3+4");
+pub(crate) fn run_code_native(code: &str) -> u32 {
+    let expr = parse_code(code);
     let expr = resolution::compile_with_env(&expr, vec![]);
     let instrs = compile::compile(expr);
     let bytes = compile(instrs);
@@ -18,7 +17,12 @@ fn test_generate_shellcode() {
     let mem = mem.make_exec().unwrap();
     let exe_fn: ExeCodeFn = unsafe { std::mem::transmute(mem.as_ptr()) };
     let value = exe_fn();
-    println!("==> value is: {}", value);
+    value as _
+}
+
+#[test]
+fn test_generate_shellcode() {
+    assert_eq!(run_code_native("3+4"), 7);
 }
 
 pub(crate) fn compile(instrs: Vec<super::Instruction>) -> Vec<u8> {
@@ -57,22 +61,25 @@ pub(crate) fn compile(instrs: Vec<super::Instruction>) -> Vec<u8> {
                 asm.mul(rcx).unwrap();
                 asm.push(rax).unwrap();
             }
+            // 由类型检查保证 And 和 Or 的操作数总是 bool 类型。
             super::Instruction::And => {
                 asm.pop(rax).unwrap();
                 asm.pop(rcx).unwrap();
                 asm.and(rax, rcx).unwrap();
+                asm.and(rax, 1).unwrap();
                 asm.push(rax).unwrap();
             }
             super::Instruction::Or => {
                 asm.pop(rax).unwrap();
                 asm.pop(rcx).unwrap();
                 asm.or(rax, rcx).unwrap();
+                asm.and(rax, 1).unwrap();
                 asm.push(rax).unwrap();
             }
             super::Instruction::Not => {
                 asm.pop(rax).unwrap();
-                // todo 改成逻辑 or。
                 asm.not(rax).unwrap();
+                asm.and(rax, 1).unwrap();
                 asm.push(rax).unwrap();
             }
             super::Instruction::Le => {
@@ -84,29 +91,26 @@ pub(crate) fn compile(instrs: Vec<super::Instruction>) -> Vec<u8> {
                 asm.push(rcx).unwrap();
             }
             super::Instruction::Ge => {
-                // todo ge
                 asm.pop(rcx).unwrap();
                 asm.pop(rax).unwrap();
                 asm.cmp(rax, rcx).unwrap();
-                asm.setna(al).unwrap();
+                asm.setae(al).unwrap();
                 asm.movzx(rcx, al).unwrap();
                 asm.push(rcx).unwrap();
             }
             super::Instruction::Lt => {
-                // todo ge
                 asm.pop(rcx).unwrap();
                 asm.pop(rax).unwrap();
                 asm.cmp(rax, rcx).unwrap();
-                asm.setna(al).unwrap();
+                asm.setnae(al).unwrap();
                 asm.movzx(rcx, al).unwrap();
                 asm.push(rcx).unwrap();
             }
             super::Instruction::Gt => {
-                // todo ge
                 asm.pop(rcx).unwrap();
                 asm.pop(rax).unwrap();
                 asm.cmp(rax, rcx).unwrap();
-                asm.setna(al).unwrap();
+                asm.seta(al).unwrap();
                 asm.movzx(rcx, al).unwrap();
                 asm.push(rcx).unwrap();
             }

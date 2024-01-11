@@ -15,7 +15,10 @@ use resolution::{make_identifier, Identifier};
 use semantic::{check_expr, solve};
 use vm::{SysCall, Vm};
 
-use crate::semantic::{apply_subst, t_arrow, Typ};
+use crate::{
+    compile::native::run_code_native,
+    semantic::{apply_subst, t_arrow, Typ},
+};
 
 fn evaluate(expr: &Expression, env: &HashMap<String, isize>) -> isize {
     match expr {
@@ -264,42 +267,73 @@ fn test_compile_and_run_vars() {
 
 #[test]
 fn test_compile_and_run() {
-    macro_rules! test_evaluate_code {
+    macro_rules! run {
         ($($t:tt)*) => {
             assert_eq!(compile_and_run(stringify!($($t)*)), $($t)*);
         };
     }
-    test_evaluate_code!(1 + 2 * 3);
-    test_evaluate_code!(if 5 > 2 { 1 } else { 0 });
-    test_evaluate_code!(if 2 > 2 { 1 } else { 0 });
-    test_evaluate_code!(if 2 >= 2 { 1 } else { 0 });
-    test_evaluate_code!(if 2 >= 4 { 1 } else { 0 });
+    run!(1 + 2 * 3);
+    run!(if 5 > 2 { 1 } else { 0 });
+    run!(if 2 > 2 { 1 } else { 0 });
+    run!(if 2 >= 2 { 1 } else { 0 });
+    run!(if 2 >= 4 { 1 } else { 0 });
 
-    test_evaluate_code!(if 5 < 2 { 1 } else { 0 });
-    test_evaluate_code!(if 2 < 2 { 1 } else { 0 });
-    test_evaluate_code!(if 2 <= 2 { 1 } else { 0 });
-    test_evaluate_code!(if 2 <= 4 { 1 } else { 0 });
-    test_evaluate_code!(if 2 < 4 { 1 } else { 0 });
+    run!(if 5 < 2 { 1 } else { 0 });
+    run!(if 2 < 2 { 1 } else { 0 });
+    run!(if 2 <= 2 { 1 } else { 0 });
+    run!(if 2 <= 4 { 1 } else { 0 });
+    run!(if 2 < 4 { 1 } else { 0 });
 
-    test_evaluate_code!(if 2 < 4 && 3 > 2 { 1 } else { 0 });
-    test_evaluate_code!(if 2 < 4 && 3 > 5 { 1 } else { 0 });
+    run!(if 2 < 4 && 3 > 2 { 1 } else { 0 });
+    run!(if 2 < 4 && 3 > 5 { 1 } else { 0 });
 
-    test_evaluate_code!(if 2 < 4 && 3 > 5 || 5 > 1 { 1 } else { 0 });
+    run!(if 2 < 4 && 3 > 5 || 5 > 1 { 1 } else { 0 });
 
-    test_evaluate_code!(if 2 < 4 && 3 > 5 || !(5 > 1) { 1 } else { 0 });
+    run!(if 2 < 4 && 3 > 5 || !(5 > 1) { 1 } else { 0 });
 
     // todo 虚拟机的负数支持。
-    // test_evaluate_code!(1 + 2 * -3);
-    // test_evaluate_code!(1 + 2 - -3);
-    test_evaluate_code!(1 + 2 * 3 - (5 - 2));
-    // test_evaluate_code!(1 + 2 * 3 - -(5 - 2));
-    // test_evaluate_code!(1 + 2 * 3 / -(5 - 2));
+    // run!(1 + 2 * -3);
+    // run!(1 + 2 - -3);
+    run!(1 + 2 * 3 - (5 - 2));
+    // run!(1 + 2 * 3 - -(5 - 2));
+    // run!(1 + 2 * 3 / -(5 - 2));
+}
+
+#[test]
+fn test_run_native() {
+    macro_rules! run {
+        ($($t:tt)*) => {
+            assert_eq!(run_code_native(stringify!($($t)*)), $($t)*);
+        };
+    }
+    run!(1 + 2 * 3);
+    run!(if 5 > 2 { 1 } else { 0 });
+    run!(if 2 > 2 { 1 } else { 0 });
+    run!(if 2 >= 2 { 1 } else { 0 });
+    run!(if 2 >= 4 { 1 } else { 0 });
+
+    run!(if 5 < 2 { 1 } else { 0 });
+    run!(if 2 < 2 { 1 } else { 0 });
+    run!(if 2 <= 2 { 1 } else { 0 });
+    run!(if 2 <= 4 { 1 } else { 0 });
+    run!(if 2 < 4 { 1 } else { 0 });
+
+    run!(if 2 < 4 && 3 > 2 { 1 } else { 0 });
+    run!(if 2 < 4 && 3 > 5 { 1 } else { 0 });
+
+    run!(if 2 < 4 && 3 > 5 || 5 > 1 { 1 } else { 0 });
+
+    run!(if 2 < 4 && 3 > 5 || !(5 > 1) { 1 } else { 0 });
+
+    run!(1 + 2 * 3 - (5 - 2));
 }
 
 fn main() {
     for line in std::io::stdin().lines() {
         let line = line.unwrap();
         let result = compile_and_run(&line);
-        println!("={result}");
+        println!("Run on VM = {result}");
+        let result = run_code_native(&line);
+        println!("Run native = {result}");
     }
 }
