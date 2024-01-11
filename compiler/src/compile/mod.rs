@@ -1,4 +1,5 @@
 pub(crate) mod bytecode;
+pub(crate) mod native;
 
 use crate::{
     parser::{BinaryOperator, ComparisonOperator, LogicalOperator},

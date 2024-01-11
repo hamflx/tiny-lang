@@ -6,3 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+memmap2 = "0.9.3"
+
+[dependencies.iced-x86]
+version = "1.20.0"
+features = ["code_asm"]
