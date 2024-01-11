@@ -170,12 +170,20 @@ impl Vm {
                 Instruction::SysCall => {
                     let call_no = self.code[self.pc as usize + 1];
                     let len = self.code[self.pc as usize + 2];
-                    if len != 0 {
-                        todo!();
-                    }
                     let syscall = &self.syscalls[call_no as usize];
-                    let f: fn() -> u32 = unsafe { std::mem::transmute(syscall.ptr) };
-                    let result = f();
+                    let result = match len {
+                        0 => (unsafe { std::mem::transmute::<_, fn() -> u32>(syscall.ptr) })(),
+                        1 => (unsafe { std::mem::transmute::<_, fn(u32) -> u32>(syscall.ptr) })(
+                            self.pop(),
+                        ),
+                        2 => {
+                            let ptr = syscall.ptr;
+                            let p2 = self.pop();
+                            let p1 = self.pop();
+                            (unsafe { std::mem::transmute::<_, fn(u32, u32) -> u32>(ptr) })(p1, p2)
+                        }
+                        _ => todo!(),
+                    };
                     self.push(result);
                     self.pc += 3;
                 }

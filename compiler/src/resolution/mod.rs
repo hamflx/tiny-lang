@@ -109,9 +109,13 @@ pub(crate) fn make_identifier(name: String) -> Identifier {
 
 fn compile_impl(expr: &Expression, env: Vec<Identifier>) -> Expr {
     match expr {
-        Expression::Var(var_name) => {
-            Expr::Var(env.iter().find(|i| i.name == *var_name).unwrap().clone())
-        }
+        Expression::Var(var_name) => Expr::Var(
+            env.iter()
+                .find(|i| i.name == *var_name)
+                .ok_or_else(|| format!("No variable named {var_name}"))
+                .unwrap()
+                .clone(),
+        ),
         Expression::CstI(i) => Expr::CstI(*i),
         Expression::CstF(f) => Expr::CstF(*f),
         Expression::CstB(b) => Expr::CstB(*b),
