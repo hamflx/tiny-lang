@@ -79,23 +79,68 @@ impl TryFrom<u32> for Instruction {
     }
 }
 
+pub trait ToAny: 'static {
+    fn as_any(&self) -> &dyn std::any::Any;
+}
+
+impl<T: 'static> ToAny for T {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
+pub(crate) trait CallContext: ToAny {}
+
 pub(crate) struct SysCall {
     ptr: *const (),
     param_count: usize,
+    pub(crate) ctx: Option<Box<dyn CallContext>>,
 }
 
 impl SysCall {
-    pub(crate) fn new(ptr: *const (), param_count: usize) -> Self {
-        Self { ptr, param_count }
+    pub(crate) fn new(
+        ptr: *const (),
+        param_count: usize,
+        ctx: Option<Box<dyn CallContext>>,
+    ) -> Self {
+        Self {
+            ptr,
+            param_count,
+            ctx,
+        }
+    }
+}
+
+pub(crate) struct VmStack {
+    sp: u32,
+    stack: Vec<u32>,
+}
+
+impl VmStack {
+    pub(crate) fn new() -> Self {
+        Self {
+            sp: 0,
+            stack: vec![0; 4096],
+        }
+    }
+
+    pub(crate) fn push(&mut self, i: u32) {
+        self.sp += 1;
+        self.stack[self.sp as usize] = i;
+    }
+
+    pub(crate) fn pop(&mut self) -> u32 {
+        let i = self.stack[self.sp as usize];
+        self.sp -= 1;
+        i
     }
 }
 
 pub(crate) struct Vm {
     code: Vec<u32>,
-    stack: Vec<u32>,
+    stack: VmStack,
     pc: u32,
-    sp: u32,
-    syscalls: Vec<SysCall>,
+    sys_calls: Vec<SysCall>,
 }
 
 impl Vm {
@@ -106,15 +151,14 @@ impl Vm {
             .collect();
         Self {
             code,
-            stack: vec![0; 4096],
+            stack: VmStack::new(),
             pc: 0,
-            sp: 0,
-            syscalls: vec![],
+            sys_calls: vec![],
         }
     }
 
-    pub(crate) fn add_sys_call(&mut self, syscall: SysCall) {
-        self.syscalls.push(syscall);
+    pub(crate) fn add_sys_call(&mut self, sys_call: SysCall) {
+        self.sys_calls.push(sys_call);
     }
 
     pub(crate) fn start(&mut self) -> u32 {
@@ -124,39 +168,37 @@ impl Vm {
             match instr {
                 Instruction::Const => {
                     let operand = self.code[self.pc as usize + 1];
-                    self.stack[self.sp as usize + 1] = operand;
-                    self.sp += 1;
+                    self.stack.push(operand);
                     self.pc += 2;
                 }
                 Instruction::Add => {
-                    let op1 = self.stack[self.sp as usize];
-                    let op2 = self.stack[self.sp as usize - 1];
-                    self.stack[self.sp as usize - 1] = op1 + op2;
-                    self.sp -= 1;
+                    let op1 = self.stack.pop();
+                    let op2 = self.stack.pop();
+                    self.stack.push(op1 + op2);
                     self.pc += 1;
                 }
                 Instruction::Mul => {
-                    let op1 = self.stack[self.sp as usize];
-                    let op2 = self.stack[self.sp as usize - 1];
-                    self.stack[self.sp as usize - 1] = op1 * op2;
-                    self.sp -= 1;
+                    let op1 = self.stack.pop();
+                    let op2 = self.stack.pop();
+                    self.stack.push(op1 * op2);
                     self.pc += 1;
                 }
                 Instruction::Var => {
                     let offset = self.code[self.pc as usize + 1];
-                    let var = self.stack[(self.sp - offset) as usize];
-                    self.stack[(self.sp + 1) as usize] = var;
-                    self.sp += 1;
+                    let var = self.stack.stack[(self.stack.sp - offset) as usize];
+                    self.stack.stack[(self.stack.sp + 1) as usize] = var;
+                    self.stack.sp += 1;
                     self.pc += 2;
                 }
                 Instruction::Pop => {
-                    self.sp -= 1;
+                    self.stack.sp -= 1;
                     self.pc += 1;
                 }
                 Instruction::Swap => {
-                    let top = self.stack[self.sp as usize];
-                    self.stack[self.sp as usize] = self.stack[self.sp as usize - 1];
-                    self.stack[self.sp as usize - 1] = top;
+                    let top = self.stack.stack[self.stack.sp as usize];
+                    self.stack.stack[self.stack.sp as usize] =
+                        self.stack.stack[self.stack.sp as usize - 1];
+                    self.stack.stack[self.stack.sp as usize - 1] = top;
                     self.pc += 1;
                 }
                 Instruction::Call => {
@@ -170,17 +212,22 @@ impl Vm {
                 Instruction::SysCall => {
                     let call_no = self.code[self.pc as usize + 1];
                     let len = self.code[self.pc as usize + 2];
-                    let syscall = &self.syscalls[call_no as usize];
+                    let syscall = &self.sys_calls[call_no as usize];
                     let result = match len {
-                        0 => (unsafe { std::mem::transmute::<_, fn() -> u32>(syscall.ptr) })(),
-                        1 => (unsafe { std::mem::transmute::<_, fn(u32) -> u32>(syscall.ptr) })(
-                            self.pop(),
-                        ),
+                        0 => {
+                            (unsafe { std::mem::transmute::<_, fn(&SysCall) -> u32>(syscall.ptr) })(
+                                syscall,
+                            )
+                        }
+                        1 => (unsafe {
+                            std::mem::transmute::<_, fn(&SysCall, u32) -> u32>(syscall.ptr)
+                        })(syscall, self.stack.pop()),
                         2 => {
-                            let ptr = syscall.ptr;
-                            let p2 = self.pop();
-                            let p1 = self.pop();
-                            (unsafe { std::mem::transmute::<_, fn(u32, u32) -> u32>(ptr) })(p1, p2)
+                            let p2 = self.stack.pop();
+                            let p1 = self.stack.pop();
+                            (unsafe {
+                                std::mem::transmute::<_, fn(&SysCall, u32, u32) -> u32>(syscall.ptr)
+                            })(syscall, p1, p2)
                         }
                         _ => todo!(),
                     };
@@ -193,7 +240,7 @@ impl Vm {
                     let ret_value = self.pop();
                     let ret_addr = self.pop();
 
-                    self.sp -= n;
+                    self.stack.sp -= n;
 
                     self.push(ret_value);
                     self.pc = ret_addr;
@@ -212,8 +259,8 @@ impl Vm {
                     }
                 }
                 Instruction::Exit => {
-                    assert_eq!(self.sp, 1);
-                    return self.stack[self.sp as usize];
+                    assert_eq!(self.stack.sp, 1);
+                    return self.stack.stack[self.stack.sp as usize];
                 }
                 Instruction::Sub => {
                     let b = self.pop();
@@ -267,14 +314,11 @@ impl Vm {
     }
 
     fn push(&mut self, value: u32) {
-        self.sp += 1;
-        self.stack[self.sp as usize] = value;
+        self.stack.push(value)
     }
 
     fn pop(&mut self) -> u32 {
-        let value = self.stack[self.sp as usize];
-        self.sp -= 1;
-        value
+        self.stack.pop()
     }
 
     fn operand(&mut self) -> u32 {

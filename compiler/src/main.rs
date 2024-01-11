@@ -14,7 +14,7 @@ use compile::build_syscall_stub;
 use parser::parse_code;
 use resolution::{make_identifier, Identifier};
 use semantic::{check_expr, solve};
-use vm::{SysCall, Vm};
+use vm::{CallContext, SysCall, Vm};
 
 use crate::{
     compile::native::run_code_native,
@@ -71,15 +71,6 @@ fn test_evalute() {
     test_evaluate_code!(8 / 3);
 }
 
-fn now() -> u32 {
-    return 10086;
-}
-
-fn get_sys_var(no: u32, typ: u32) -> u32 {
-    println!("get sys var: no={no}, typ={typ}");
-    return 10010;
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SysVariableTable {
     rows: Vec<SysVariableTableRecord>,
@@ -92,16 +83,15 @@ struct SysVariableTableRecord {
     typ: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
 struct SysCallTable {
     rows: Vec<SysCallTableRecord>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
 struct SysCallTableRecord {
     ptr: *const (),
     id: Identifier,
     typ: Typ,
+    ctx: Option<Box<dyn CallContext>>,
 }
 
 fn replace_var_with_call(
@@ -218,40 +208,76 @@ fn compile_to_byte_code(
     compile::bytecode::compile(instrs)
 }
 
-fn build_default_sys_calls() -> SysCallTable {
+struct SysCallGetContext {
+    get: Box<dyn Fn(u32, u32) -> u32>,
+}
+
+impl CallContext for SysCallGetContext {}
+
+impl std::fmt::Debug for SysCallGetContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SysCallGetContext")
+            .field("get", &"Fn(u32, u32) -> u32")
+            .finish()
+    }
+}
+
+fn build_default_sys_calls(get_var: impl Fn(u32, u32) -> u32 + 'static) -> SysCallTable {
+    fn now(_: &SysCall) -> u32 {
+        return 10086;
+    }
+
+    fn get_sys_var(sys_call: &SysCall, no: u32, typ: u32) -> u32 {
+        println!("get sys var: no={no}, typ={typ}");
+        let ctx = sys_call.ctx.as_ref().unwrap().as_ref();
+        let ctx: &dyn std::any::Any = ctx.as_any();
+        let ctx = ctx.downcast_ref::<SysCallGetContext>().unwrap();
+        return (ctx.get)(no, typ);
+    }
+
     SysCallTable {
         rows: vec![
             SysCallTableRecord {
                 ptr: get_sys_var as *const (),
                 id: make_identifier("get".to_string()),
                 typ: t_arrow(Typ::Int, &[Typ::Int, Typ::Int]),
+                ctx: Some(Box::new(SysCallGetContext {
+                    get: Box::new(get_var),
+                })),
             },
             SysCallTableRecord {
                 ptr: now as *const (),
                 id: make_identifier("now".to_string()),
                 typ: t_arrow(Typ::Int, &[]),
+                ctx: None,
             },
         ],
     }
 }
 
-fn build_default_sys_vars() -> SysVariableTable {
-    SysVariableTable {
-        rows: vec![SysVariableTableRecord {
-            id: make_identifier("age".to_string()),
-            no: 0,
-            typ: 1,
-        }],
-    }
+fn compile_and_run(code: &str) -> isize {
+    compile_and_run_with_vars(code, &[])
 }
 
-fn compile_and_run(code: &str) -> isize {
-    let sys_calls = build_default_sys_calls();
-    let sys_vars = build_default_sys_vars();
-    let bytecode = compile_to_byte_code(code, &sys_calls, &sys_vars, 0);
+fn compile_and_run_with_vars(code: &str, vars: &[(&str, u32)]) -> isize {
+    let get_var = {
+        let vars: Vec<_> = vars.iter().map(|(s, v)| (s.to_string(), *v)).collect();
+        move |no: u32, typ: u32| vars[no as usize].1
+    };
+    let sys_calls = build_default_sys_calls(get_var);
+    let rows = vars
+        .iter()
+        .enumerate()
+        .map(|(i, (s, v))| SysVariableTableRecord {
+            id: make_identifier(s.to_string()),
+            no: i,
+            typ: 1,
+        })
+        .collect();
+    let bytecode = compile_to_byte_code(code, &sys_calls, &SysVariableTable { rows }, 0);
     let mut vm = Vm::create(bytecode);
-    for SysCallTableRecord { ptr, typ, .. } in sys_calls.rows {
-        vm.add_sys_call(SysCall::new(ptr, typ.arg_len().unwrap()));
+    for SysCallTableRecord { ptr, typ, ctx, .. } in sys_calls.rows {
+        vm.add_sys_call(SysCall::new(ptr, typ.arg_len().unwrap(), ctx));
     }
     vm.start() as isize
 }
@@ -263,7 +289,10 @@ fn test_compile_and_run_now() {
 
 #[test]
 fn test_compile_and_run_vars() {
-    assert_eq!(compile_and_run("age + 1"), 10011);
+    assert_eq!(
+        compile_and_run_with_vars("age + 1", &[("age", 10010)]),
+        10011
+    );
 }
 
 #[test]
