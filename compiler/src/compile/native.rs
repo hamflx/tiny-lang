@@ -42,32 +42,32 @@ pub(crate) fn compile(instrs: Vec<super::Instruction>) -> Vec<u8> {
             }
             super::Instruction::Add => {
                 asm.pop(rax).unwrap();
-                asm.pop(rbx).unwrap();
-                asm.add(rax, rbx).unwrap();
+                asm.pop(rcx).unwrap();
+                asm.add(rax, rcx).unwrap();
                 asm.push(rax).unwrap();
             }
             super::Instruction::Sub => {
-                asm.pop(rbx).unwrap();
+                asm.pop(rcx).unwrap();
                 asm.pop(rax).unwrap();
-                asm.sub(rax, rbx).unwrap();
+                asm.sub(rax, rcx).unwrap();
                 asm.push(rax).unwrap();
             }
             super::Instruction::Mul => {
                 asm.pop(rax).unwrap();
-                asm.pop(rbx).unwrap();
-                asm.mul(rbx).unwrap();
+                asm.pop(rcx).unwrap();
+                asm.mul(rcx).unwrap();
                 asm.push(rax).unwrap();
             }
             super::Instruction::And => {
                 asm.pop(rax).unwrap();
-                asm.pop(rbx).unwrap();
-                asm.and(rax, rbx).unwrap();
+                asm.pop(rcx).unwrap();
+                asm.and(rax, rcx).unwrap();
                 asm.push(rax).unwrap();
             }
             super::Instruction::Or => {
                 asm.pop(rax).unwrap();
-                asm.pop(rbx).unwrap();
-                asm.or(rax, rbx).unwrap();
+                asm.pop(rcx).unwrap();
+                asm.or(rax, rcx).unwrap();
                 asm.push(rax).unwrap();
             }
             super::Instruction::Not => {
@@ -77,48 +77,48 @@ pub(crate) fn compile(instrs: Vec<super::Instruction>) -> Vec<u8> {
                 asm.push(rax).unwrap();
             }
             super::Instruction::Le => {
-                asm.pop(rbx).unwrap();
+                asm.pop(rcx).unwrap();
                 asm.pop(rax).unwrap();
-                asm.cmp(rax, rbx).unwrap();
+                asm.cmp(rax, rcx).unwrap();
                 asm.setna(al).unwrap();
-                asm.movzx(rbx, al).unwrap();
-                asm.push(rbx).unwrap();
+                asm.movzx(rcx, al).unwrap();
+                asm.push(rcx).unwrap();
             }
             super::Instruction::Ge => {
                 // todo ge
-                asm.pop(rbx).unwrap();
+                asm.pop(rcx).unwrap();
                 asm.pop(rax).unwrap();
-                asm.cmp(rax, rbx).unwrap();
+                asm.cmp(rax, rcx).unwrap();
                 asm.setna(al).unwrap();
-                asm.movzx(rbx, al).unwrap();
-                asm.push(rbx).unwrap();
+                asm.movzx(rcx, al).unwrap();
+                asm.push(rcx).unwrap();
             }
             super::Instruction::Lt => {
                 // todo ge
-                asm.pop(rbx).unwrap();
+                asm.pop(rcx).unwrap();
                 asm.pop(rax).unwrap();
-                asm.cmp(rax, rbx).unwrap();
+                asm.cmp(rax, rcx).unwrap();
                 asm.setna(al).unwrap();
-                asm.movzx(rbx, al).unwrap();
-                asm.push(rbx).unwrap();
+                asm.movzx(rcx, al).unwrap();
+                asm.push(rcx).unwrap();
             }
             super::Instruction::Gt => {
                 // todo ge
-                asm.pop(rbx).unwrap();
+                asm.pop(rcx).unwrap();
                 asm.pop(rax).unwrap();
-                asm.cmp(rax, rbx).unwrap();
+                asm.cmp(rax, rcx).unwrap();
                 asm.setna(al).unwrap();
-                asm.movzx(rbx, al).unwrap();
-                asm.push(rbx).unwrap();
+                asm.movzx(rcx, al).unwrap();
+                asm.push(rcx).unwrap();
             }
             super::Instruction::Pop => {
                 asm.pop(rax).unwrap();
             }
             super::Instruction::Swap => {
                 asm.pop(rax).unwrap();
-                asm.pop(rbx).unwrap();
+                asm.pop(rcx).unwrap();
                 asm.push(rax).unwrap();
-                asm.push(rbx).unwrap();
+                asm.push(rcx).unwrap();
             }
             super::Instruction::Exit => {
                 asm.pop(rax).unwrap();
@@ -129,8 +129,8 @@ pub(crate) fn compile(instrs: Vec<super::Instruction>) -> Vec<u8> {
                 asm.push(rax).unwrap();
             }
             super::Instruction::Var(i) => {
-                asm.mov(rbx, i as i64).unwrap();
-                asm.mov(rax, rax + rbx * 8 + 0).unwrap();
+                asm.mov(rcx, i as i64).unwrap();
+                asm.mov(rax, rax + rcx * 8 + 0).unwrap();
                 asm.push(rax).unwrap();
             }
             super::Instruction::Ret(0) => {
