@@ -1,7 +1,7 @@
+mod ast;
 mod compile;
 mod lexer;
 mod parser;
-mod parser_gen;
 mod resolution;
 mod semantic;
 mod utils;
@@ -9,8 +9,9 @@ mod vm;
 
 use std::collections::HashMap;
 
+use ast::{BinaryOperator, Expression};
 use compile::build_syscall_stub;
-use parser::{parse_code, BinaryOperator, Expression};
+use parser::parse_code;
 use resolution::{make_identifier, Identifier};
 use semantic::{check_expr, solve};
 use vm::{SysCall, Vm};

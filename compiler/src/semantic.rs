@@ -1,7 +1,6 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::{
-    parser::Expression,
     resolution,
     utils::expression::{
         if_expr, integer, let_expr, op_add, op_lt, op_mul, op_sub, time_span, timestamp, var,

@@ -2,7 +2,7 @@ pub(crate) mod bytecode;
 pub(crate) mod native;
 
 use crate::{
-    parser::{BinaryOperator, ComparisonOperator, LogicalOperator},
+    ast::{BinaryOperator, ComparisonOperator, LogicalOperator},
     resolution::{self, make_identifier, Identifier},
     utils::expression::{app_fn, integer, let_expr, let_fn, op_add, op_mul, op_sub, var},
 };

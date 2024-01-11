@@ -1,6 +1,6 @@
-use crate::parser::{
-    BinaryExpression, BinaryOperator, CallExpression, ComparisonExpression, ComparisonOperator,
-    Expression, FnExpression, IfExpression, LetExpression, LogicalExpression, LogicalOperator,
+use crate::ast::{
+    BinaryExpression, BinaryOperator, ComparisonExpression, ComparisonOperator, Expression,
+    FnExpression, IfExpression, LetExpression, LogicalExpression, LogicalOperator,
 };
 
 pub(crate) fn id(name: String) -> Expression {

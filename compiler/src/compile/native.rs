@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use iced_x86::code_asm::*;
 use memmap2::MmapOptions;
 
-use crate::{compile, parser_gen::parse_code, resolution};
+use crate::{compile, parser::parse_code, resolution};
 
 type ExeCodeFn = extern "system" fn() -> usize;
 

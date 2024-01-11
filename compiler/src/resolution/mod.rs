@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::{
-    parser::{BinaryOperator, ComparisonOperator, Expression, LogicalOperator},
+    ast::{BinaryOperator, ComparisonOperator, Expression, LogicalOperator},
     utils::expression::{app_fn, integer, let_expr, let_fn, op_mul, op_sub, var},
 };
 
