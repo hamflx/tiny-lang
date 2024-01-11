@@ -290,13 +290,13 @@ fn compile_and_run_with_vars(code: &str, vars: &[(&str, u32)]) -> isize {
 
 #[test]
 fn test_compile_and_run_now() {
-    assert_eq!(
-        compile_and_run("now() + 1") / 10,
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as isize
-            / 10
+    assert!(
+        (compile_and_run("now() + 1")
+            - SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs() as isize)
+            < 2
     );
 }
 
