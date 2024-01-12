@@ -52,68 +52,72 @@ pub(crate) fn parse_code(code: &str) -> Expression {
     parseP(&mut tokenizer)
 }
 
+fn err(expected: &[&str], got: &Token) -> ! {
+    panic!("Expected: {:?}, but got {:?}", expected, got)
+}
+
 pub(crate) fn parseP(tokenizer: &mut Tokenizer) -> Expression {
     match tokenizer.token() {
         Token::Not | Token::LParen | Token::Minus | Token::Id(_) | Token::If | Token::Num(_) => {
-            let expr = parseE(tokenizer);
+            let e0 = parseE(tokenizer);
             tokenizer.eat(Token::Eof);
-            expr
+            e0
         }
-        tok => panic!("expected `Token::Not`, `Token::LParen`, `Token::Minus`, `Token::Id(_)`, `Token::If`, `Token::Num(_)`, but got {:#?}", tok),
+        tok => err(&["!", "(", "-", "id", "if", "num"], &tok),
     }
 }
 fn parseE(tokenizer: &mut Tokenizer) -> Expression {
     match tokenizer.token() {
         Token::Not | Token::LParen | Token::Minus | Token::Id(_) | Token::If | Token::Num(_) => {
-            let left = parseO(tokenizer);
-            parseE_(tokenizer, left)
+            let e0 = parseO(tokenizer);
+            parseE_(tokenizer, e0)
         }
-        tok => panic!("expected `Token::Not`, `Token::LParen`, `Token::Minus`, `Token::Id(_)`, `Token::If`, `Token::Num(_)`, but got {:#?}", tok),
+        tok => err(&["!", "(", "-", "id", "if", "num"], &tok),
     }
 }
-fn parseE_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
+fn parseE_(tokenizer: &mut Tokenizer, prefix: Expression) -> Expression {
     match tokenizer.token() {
-        Token::Eof | Token::RParen | Token::Comma | Token::LBrace | Token::RBrace => left,
+        Token::Eof | Token::RParen | Token::Comma | Token::LBrace | Token::RBrace => prefix,
         Token::Or => {
             tokenizer.eat(Token::Or);
-            let right = parseO(tokenizer);
-            parseE_(tokenizer, op_or(left, right))
+            let e1 = parseO(tokenizer);
+            parseE_(tokenizer, op_or(prefix, e1))
         }
-        tok => panic!("expected `Token::Eof`, `Token::RParen`, `Token::Comma`, `Token::LBrace`, `Token::RBrace`, `Token::Or`, but got {:#?}", tok),
+        tok => err(&["$", ")", ",", "{", "}", "||"], &tok),
     }
 }
 fn parseO(tokenizer: &mut Tokenizer) -> Expression {
     match tokenizer.token() {
         Token::Not | Token::LParen | Token::Minus | Token::Id(_) | Token::If | Token::Num(_) => {
-            let left = parseA(tokenizer);
-            parseO_(tokenizer, left)
+            let e0 = parseA(tokenizer);
+            parseO_(tokenizer, e0)
         }
-        tok => panic!("expected `Token::Not`, `Token::LParen`, `Token::Minus`, `Token::Id(_)`, `Token::If`, `Token::Num(_)`, but got {:#?}", tok),
+        tok => err(&["!", "(", "-", "id", "if", "num"], &tok),
     }
 }
-fn parseO_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
+fn parseO_(tokenizer: &mut Tokenizer, prefix: Expression) -> Expression {
     match tokenizer.token() {
         Token::Eof | Token::RParen | Token::Comma | Token::LBrace | Token::RBrace | Token::Or => {
-            left
+            prefix
         }
         Token::And => {
             tokenizer.eat(Token::And);
-            let right = parseA(tokenizer);
-            parseO_(tokenizer, op_and(left, right))
+            let e1 = parseA(tokenizer);
+            parseO_(tokenizer, op_and(prefix, e1))
         }
-        tok => panic!("expected `Token::Eof`, `Token::RParen`, `Token::Comma`, `Token::LBrace`, `Token::RBrace`, `Token::Or`, `Token::And`, but got {:#?}", tok),
+        tok => err(&["$", ")", ",", "{", "}", "||", "&&"], &tok),
     }
 }
 fn parseA(tokenizer: &mut Tokenizer) -> Expression {
     match tokenizer.token() {
         Token::Not | Token::LParen | Token::Minus | Token::Id(_) | Token::If | Token::Num(_) => {
-            let left = parseB(tokenizer);
-            parseA_(tokenizer, left)
+            let e0 = parseB(tokenizer);
+            parseA_(tokenizer, e0)
         }
-        tok => panic!("expected `Token::Not`, `Token::LParen`, `Token::Minus`, `Token::Id(_)`, `Token::If`, `Token::Num(_)`, but got {:#?}", tok),
+        tok => err(&["!", "(", "-", "id", "if", "num"], &tok),
     }
 }
-fn parseA_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
+fn parseA_(tokenizer: &mut Tokenizer, prefix: Expression) -> Expression {
     match tokenizer.token() {
         Token::Eof
         | Token::RParen
@@ -121,45 +125,48 @@ fn parseA_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
         | Token::LBrace
         | Token::RBrace
         | Token::Or
-        | Token::And => left,
+        | Token::And => prefix,
         Token::LessThan => {
             tokenizer.eat(Token::LessThan);
-            let right = parseB(tokenizer);
-            parseA_(tokenizer, op_lt(left, right))
+            let e1 = parseB(tokenizer);
+            parseA_(tokenizer, op_lt(prefix, e1))
         }
         Token::LessEqual => {
             tokenizer.eat(Token::LessEqual);
-            let right = parseB(tokenizer);
-            parseA_(tokenizer, op_le(left, right))
+            let e1 = parseB(tokenizer);
+            parseA_(tokenizer, op_le(prefix, e1))
         }
         Token::GreaterThan => {
             tokenizer.eat(Token::GreaterThan);
-            let right = parseB(tokenizer);
-            parseA_(tokenizer, op_gt(left, right))
+            let e1 = parseB(tokenizer);
+            parseA_(tokenizer, op_gt(prefix, e1))
         }
         Token::GreaterEqual => {
             tokenizer.eat(Token::GreaterEqual);
-            let right = parseB(tokenizer);
-            parseA_(tokenizer, op_ge(left, right))
+            let e1 = parseB(tokenizer);
+            parseA_(tokenizer, op_ge(prefix, e1))
         }
-        tok => panic!("expected `Token::Eof`, `Token::RParen`, `Token::Comma`, `Token::LBrace`, `Token::RBrace`, `Token::Or`, `Token::And`, `Token::LessThan`, `Token::LessEqual`, `Token::GreaterThan`, `Token::GreaterEqual`, but got {:#?}", tok),
+        tok => err(
+            &["$", ")", ",", "{", "}", "||", "&&", "<", "<=", ">", ">="],
+            &tok,
+        ),
     }
 }
 fn parseB(tokenizer: &mut Tokenizer) -> Expression {
     match tokenizer.token() {
         Token::Not | Token::LParen | Token::Minus | Token::Id(_) | Token::If | Token::Num(_) => {
-            let left = parseT(tokenizer);
-            parseB_(tokenizer, left)
+            let e0 = parseT(tokenizer);
+            parseB_(tokenizer, e0)
         }
-        tok => panic!("expected `Token::Not`, `Token::LParen`, `Token::Minus`, `Token::Id(_)`, `Token::If`, `Token::Num(_)`, but got {:#?}", tok),
+        tok => err(&["!", "(", "-", "id", "if", "num"], &tok),
     }
 }
-fn parseB_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
+fn parseB_(tokenizer: &mut Tokenizer, prefix: Expression) -> Expression {
     match tokenizer.token() {
         Token::Minus => {
             tokenizer.eat(Token::Minus);
-            let right = parseT(tokenizer);
-            parseB_(tokenizer, op_sub(left, right))
+            let e1 = parseT(tokenizer);
+            parseB_(tokenizer, op_sub(prefix, e1))
         }
         Token::Eof
         | Token::RParen
@@ -171,25 +178,30 @@ fn parseB_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
         | Token::LessThan
         | Token::LessEqual
         | Token::GreaterThan
-        | Token::GreaterEqual => left,
+        | Token::GreaterEqual => prefix,
         Token::Plus => {
             tokenizer.eat(Token::Plus);
-            let right = parseT(tokenizer);
-            parseB_(tokenizer, op_add(left, right))
+            let e1 = parseT(tokenizer);
+            parseB_(tokenizer, op_add(prefix, e1))
         }
-        tok => panic!("expected `Token::Minus`, `Token::Eof`, `Token::RParen`, `Token::Comma`, `Token::LBrace`, `Token::RBrace`, `Token::Or`, `Token::And`, `Token::LessThan`, `Token::LessEqual`, `Token::GreaterThan`, `Token::GreaterEqual`, `Token::Plus`, but got {:#?}", tok),
+        tok => err(
+            &[
+                "-", "$", ")", ",", "{", "}", "||", "&&", "<", "<=", ">", ">=", "+",
+            ],
+            &tok,
+        ),
     }
 }
 fn parseT(tokenizer: &mut Tokenizer) -> Expression {
     match tokenizer.token() {
         Token::Not | Token::LParen | Token::Minus | Token::Id(_) | Token::If | Token::Num(_) => {
-            let left = parseF(tokenizer);
-            parseT_(tokenizer, left)
+            let e0 = parseF(tokenizer);
+            parseT_(tokenizer, e0)
         }
-        tok => panic!("expected `Token::Not`, `Token::LParen`, `Token::Minus`, `Token::Id(_)`, `Token::If`, `Token::Num(_)`, but got {:#?}", tok),
+        tok => err(&["!", "(", "-", "id", "if", "num"], &tok),
     }
 }
-fn parseT_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
+fn parseT_(tokenizer: &mut Tokenizer, prefix: Expression) -> Expression {
     match tokenizer.token() {
         Token::Minus
         | Token::Eof
@@ -203,77 +215,85 @@ fn parseT_(tokenizer: &mut Tokenizer, left: Expression) -> Expression {
         | Token::LessEqual
         | Token::GreaterThan
         | Token::GreaterEqual
-        | Token::Plus => left,
+        | Token::Plus => prefix,
         Token::Mul => {
             tokenizer.eat(Token::Mul);
-            let right = parseF(tokenizer);
-            parseT_(tokenizer, op_mul(left, right))
+            let e1 = parseF(tokenizer);
+            parseT_(tokenizer, op_mul(prefix, e1))
         }
         Token::Div => {
             tokenizer.eat(Token::Div);
-            let right = parseF(tokenizer);
-            parseT_(tokenizer, op_div(left, right))
+            let e1 = parseF(tokenizer);
+            parseT_(tokenizer, op_div(prefix, e1))
         }
-        tok => panic!("expected `Token::Minus`, `Token::Eof`, `Token::RParen`, `Token::Comma`, `Token::LBrace`, `Token::RBrace`, `Token::Or`, `Token::And`, `Token::LessThan`, `Token::LessEqual`, `Token::GreaterThan`, `Token::GreaterEqual`, `Token::Plus`, `Token::Mul`, `Token::Div`, but got {:#?}", tok),
+        tok => err(
+            &[
+                "-", "$", ")", ",", "{", "}", "||", "&&", "<", "<=", ">", ">=", "+", "*", "/",
+            ],
+            &tok,
+        ),
     }
 }
 fn parseF(tokenizer: &mut Tokenizer) -> Expression {
     match tokenizer.token() {
         Token::Not => {
             tokenizer.eat(Token::Not);
-            op_not(parseN(tokenizer))
+            let e1 = parseN(tokenizer);
+            op_not(e1)
         }
-        Token::LParen | Token::Id(_) | Token::If | Token::Num(_) => parseN(tokenizer),
+        Token::LParen | Token::Id(_) | Token::If | Token::Num(_) => {
+            let e0 = parseN(tokenizer);
+            e0
+        }
         Token::Minus => {
             tokenizer.eat(Token::Minus);
-            op_sub(integer(0), parseN(tokenizer))
+            let e1 = parseN(tokenizer);
+            op_sub(integer(0), e1)
         }
-        tok => panic!("expected `Token::Not`, `Token::LParen`, `Token::Id(_)`, `Token::If`, `Token::Num(_)`, `Token::Minus`, but got {:#?}", tok),
+        tok => err(&["!", "(", "id", "if", "num", "-"], &tok),
     }
 }
 fn parseN(tokenizer: &mut Tokenizer) -> Expression {
     match tokenizer.token() {
         Token::LParen => {
             tokenizer.eat(Token::LParen);
-            let expr = parseE(tokenizer);
+            let e1 = parseE(tokenizer);
             tokenizer.eat(Token::RParen);
-            expr
+            e1
         }
         Token::Id(id) => {
             let id = id.to_string();
             tokenizer.advance();
-            parseI(tokenizer, id)
+            let e1 = parseI(tokenizer, id);
+            e1
         }
         Token::If => {
             tokenizer.eat(Token::If);
-            let cond = parseE(tokenizer);
+            let e1 = parseE(tokenizer);
             tokenizer.eat(Token::LBrace);
-            let then = parseE(tokenizer);
+            let e3 = parseE(tokenizer);
             tokenizer.eat(Token::RBrace);
             tokenizer.eat(Token::Else);
             tokenizer.eat(Token::LBrace);
-            let other = parseE(tokenizer);
+            let e7 = parseE(tokenizer);
             tokenizer.eat(Token::RBrace);
-            if_expr(cond, then, other)
+            if_expr(e1, e3, e7)
         }
         Token::Num(n) => {
             let expr = integer(n.parse().unwrap());
             tokenizer.advance();
             expr
         }
-        tok => panic!(
-            "expected `Token::LParen`, `Token::Id(_)`, `Token::If`, `Token::Num(_)`, but got {:#?}",
-            tok
-        ),
+        tok => err(&["(", "id", "if", "num"], &tok),
     }
 }
 fn parseI(tokenizer: &mut Tokenizer, callee: String) -> Expression {
     match tokenizer.token() {
         Token::LParen => {
             tokenizer.eat(Token::LParen);
-            let args = parseL(tokenizer);
+            let e1 = parseL(tokenizer);
             tokenizer.eat(Token::RParen);
-            call_expr(callee, args)
+            call_expr(callee, e1)
         }
         Token::Minus
         | Token::Eof
@@ -290,7 +310,12 @@ fn parseI(tokenizer: &mut Tokenizer, callee: String) -> Expression {
         | Token::Plus
         | Token::Mul
         | Token::Div => Expression::Var(callee),
-        tok => panic!("expected `Token::LParen`, `Token::Minus`, `Token::Eof`, `Token::RParen`, `Token::Comma`, `Token::LBrace`, `Token::RBrace`, `Token::Or`, `Token::And`, `Token::LessThan`, `Token::LessEqual`, `Token::GreaterThan`, `Token::GreaterEqual`, `Token::Plus`, `Token::Mul`, `Token::Div`, but got {:#?}", tok),
+        tok => err(
+            &[
+                "(", "-", "$", ")", ",", "{", "}", "||", "&&", "<", "<=", ">", ">=", "+", "*", "/",
+            ],
+            &tok,
+        ),
     }
 }
 fn parseL(tokenizer: &mut Tokenizer) -> Vec<Expression> {
@@ -299,29 +324,26 @@ fn parseL(tokenizer: &mut Tokenizer) -> Vec<Expression> {
             parseM(tokenizer)
         }
         Token::RParen => Vec::new(),
-        tok => panic!("expected `Token::Not`, `Token::LParen`, `Token::Minus`, `Token::Id(_)`, `Token::If`, `Token::Num(_)`, `Token::RParen`, but got {:#?}", tok),
+        tok => err(&["!", "(", "-", "id", "if", "num", ")"], &tok),
     }
 }
 fn parseM(tokenizer: &mut Tokenizer) -> Vec<Expression> {
     match tokenizer.token() {
         Token::Not | Token::LParen | Token::Minus | Token::Id(_) | Token::If | Token::Num(_) => {
-            let head = parseE(tokenizer);
-            parseM_(tokenizer, vec![head])
+            let e0 = parseE(tokenizer);
+            parseM_(tokenizer, vec![e0])
         }
-        tok => panic!("expected `Token::Not`, `Token::LParen`, `Token::Minus`, `Token::Id(_)`, `Token::If`, `Token::Num(_)`, but got {:#?}", tok),
+        tok => err(&["!", "(", "-", "id", "if", "num"], &tok),
     }
 }
-fn parseM_(tokenizer: &mut Tokenizer, args: Vec<Expression>) -> Vec<Expression> {
+fn parseM_(tokenizer: &mut Tokenizer, prefix: Vec<Expression>) -> Vec<Expression> {
     match tokenizer.token() {
-        Token::RParen => args,
+        Token::RParen => prefix,
         Token::Comma => {
             tokenizer.eat(Token::Comma);
-            let item = parseE(tokenizer);
-            parseM_(tokenizer, args.into_iter().chain([item]).collect())
+            let e1 = parseE(tokenizer);
+            parseM_(tokenizer, prefix.into_iter().chain([e1]).collect())
         }
-        tok => panic!(
-            "expected `Token::RParen`, `Token::Comma`, but got {:#?}",
-            tok
-        ),
+        tok => err(&[")", ","], &tok),
     }
 }
