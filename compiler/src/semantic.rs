@@ -105,7 +105,26 @@ pub(crate) fn check_expr(ctx: Context, expr: &resolution::Expr) -> (Typ, Constra
                     .collect(),
             )
         }
-        resolution::Expr::Fn(_) => todo!(),
+        resolution::Expr::Fn(expr) => {
+            let args: Vec<_> = expr.params.iter().map(|_| new_var()).collect();
+            let ctx = expr
+                .params
+                .iter()
+                .zip(&args)
+                .map(|(id, typ)| (id.clone(), typ.clone()))
+                .collect();
+            let (ret_typ, cs) = check_expr(ctx, &expr.body);
+            (
+                Typ::Arrow(
+                    ArrowType {
+                        out_typ: ret_typ,
+                        in_typ: args,
+                    }
+                    .into(),
+                ),
+                cs,
+            )
+        }
         resolution::Expr::App(ident, args) => {
             let t = new_var();
             let fn_type = ctx

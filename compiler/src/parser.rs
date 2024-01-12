@@ -70,13 +70,33 @@ fn err(expected: &[&str], got: &Token) -> ! {
 
 pub(crate) fn parseP(tokenizer: &mut Tokenizer) -> Expression {
     match tokenizer.token() {
-        Token::Fn => {
-            let (id, body) = parseFn(tokenizer);
+        Token::Not
+        | Token::LParen
+        | Token::Minus
+        | Token::Fn
+        | Token::Id(_)
+        | Token::If
+        | Token::Num(_) => {
+            let e0 = parseFs(tokenizer);
             let e1 = parseE(tokenizer);
             tokenizer.eat(Token::Eof);
-            let_expr(&id, body, e1)
+            e0.into_iter()
+                .fold(e1, |scope, (id, body)| let_expr(&id, body, scope))
         }
-        tok => err(&["fn"], &tok),
+        tok => err(&["!", "(", "-", "fn", "id", "if", "num"], &tok),
+    }
+}
+fn parseFs(tokenizer: &mut Tokenizer) -> Vec<(String, Expression)> {
+    match tokenizer.token() {
+        Token::Not | Token::LParen | Token::Minus | Token::Id(_) | Token::If | Token::Num(_) => {
+            Vec::new()
+        }
+        Token::Fn => {
+            let e0 = parseFn(tokenizer);
+            let e1 = parseFs(tokenizer);
+            [e0].into_iter().chain(e1).collect()
+        }
+        tok => err(&["!", "(", "-", "id", "if", "num", "fn"], &tok),
     }
 }
 fn parseFn(tokenizer: &mut Tokenizer) -> (String, Expression) {

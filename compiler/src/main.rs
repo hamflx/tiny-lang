@@ -310,6 +310,11 @@ fn test_compile_and_run_vars() {
 }
 
 #[test]
+fn test_compile_and_run_fn() {
+    assert_eq!(compile_and_run("fn hello() { 1 + 1 } hello()"), 2);
+}
+
+#[test]
 fn test_compile_and_run() {
     macro_rules! run {
         ($($t:tt)*) => {
