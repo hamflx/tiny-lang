@@ -23,6 +23,7 @@ pub(crate) enum Token {
     Div,
     If,
     Else,
+    Fn,
     Eof,
 }
 
@@ -105,6 +106,7 @@ impl<'c> Tokenizer<'c> {
                     self.token = match ident.as_str() {
                         "if" => Token::If,
                         "else" => Token::Else,
+                        "fn" => Token::Fn,
                         _ => Token::Id(ident),
                     };
                 }

@@ -2,8 +2,8 @@ use crate::{
     ast::Expression,
     lexer::{Token, Tokenizer},
     utils::expression::{
-        call_expr, if_expr, integer, op_add, op_and, op_div, op_ge, op_gt, op_le, op_lt, op_mul,
-        op_not, op_or, op_sub,
+        call_expr, fn_expr, if_expr, integer, let_expr, op_add, op_and, op_div, op_ge, op_gt,
+        op_le, op_lt, op_mul, op_not, op_or, op_sub,
     },
 };
 
@@ -46,6 +46,18 @@ fn test_parser() {
     );
 }
 
+#[test]
+fn test_parser_fn() {
+    assert_eq!(
+        parse_code("fn hello(){1} hello()"),
+        let_expr(
+            "hello",
+            fn_expr(&[], integer(1)),
+            call_expr("hello".to_string(), vec![]),
+        )
+    );
+}
+
 pub(crate) fn parse_code(code: &str) -> Expression {
     let mut tokenizer = Tokenizer::new(code);
     tokenizer.advance();
@@ -58,12 +70,32 @@ fn err(expected: &[&str], got: &Token) -> ! {
 
 pub(crate) fn parseP(tokenizer: &mut Tokenizer) -> Expression {
     match tokenizer.token() {
-        Token::Not | Token::LParen | Token::Minus | Token::Id(_) | Token::If | Token::Num(_) => {
-            let e0 = parseE(tokenizer);
+        Token::Fn => {
+            let (id, body) = parseFn(tokenizer);
+            let e1 = parseE(tokenizer);
             tokenizer.eat(Token::Eof);
-            e0
+            let_expr(&id, body, e1)
         }
-        tok => err(&["!", "(", "-", "id", "if", "num"], &tok),
+        tok => err(&["fn"], &tok),
+    }
+}
+fn parseFn(tokenizer: &mut Tokenizer) -> (String, Expression) {
+    match tokenizer.token() {
+        Token::Fn => {
+            tokenizer.eat(Token::Fn);
+            let id = match tokenizer.token() {
+                Token::Id(id) => id.to_string(),
+                tok => err(&["id"], &tok),
+            };
+            tokenizer.advance();
+            tokenizer.eat(Token::LParen);
+            tokenizer.eat(Token::RParen);
+            tokenizer.eat(Token::LBrace);
+            let e5 = parseE(tokenizer);
+            tokenizer.eat(Token::RBrace);
+            (id, fn_expr(&[], e5))
+        }
+        tok => err(&["fn"], &tok),
     }
 }
 fn parseE(tokenizer: &mut Tokenizer) -> Expression {

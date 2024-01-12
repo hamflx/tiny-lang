@@ -34,6 +34,16 @@ pub(crate) fn let_expr(name: &str, value: Expression, scope: Expression) -> Expr
     )
 }
 
+pub(crate) fn fn_expr(params: &[String], body: Expression) -> Expression {
+    Expression::Fn(
+        FnExpression {
+            params: params.into_iter().cloned().collect(),
+            body,
+        }
+        .into(),
+    )
+}
+
 pub(crate) fn call_expr(callee: String, args: Vec<Expression>) -> Expression {
     Expression::App(callee, args)
 }
