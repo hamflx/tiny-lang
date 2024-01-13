@@ -13,6 +13,7 @@ use std::{
 };
 
 use ast::{BinaryOperator, Expression};
+use clap::Parser;
 use compile::build_syscall_stub;
 use parser::parse_code;
 use resolution::{make_identifier, Identifier};
@@ -377,12 +378,26 @@ fn test_run_native() {
     run!(1 + 2 * 3 - (5 - 2));
 }
 
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    filename: Option<String>,
+}
+
 fn main() {
-    for line in std::io::stdin().lines() {
-        let line = line.unwrap();
-        let result = compile_and_run(&line);
-        println!("Run on VM = {result}");
-        let result = run_code_native(&line);
-        println!("Run native = {result}");
+    let args = Args::parse();
+    match args.filename {
+        Some(filename) => {
+            let content = std::fs::read_to_string(filename).unwrap();
+            let result = compile_and_run(&content);
+            println!("{}", result);
+        }
+        None => {
+            for line in std::io::stdin().lines() {
+                let line = line.unwrap();
+                let result = compile_and_run(&line);
+                println!("= {result}");
+            }
+        }
     }
 }
