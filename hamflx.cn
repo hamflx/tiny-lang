@@ -1,0 +1,7 @@
+fn hello () {
+  1+1
+}
+
+fn main () {
+  hello()
+}

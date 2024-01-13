@@ -84,13 +84,11 @@ pub(crate) fn check_expr(ctx: Context, expr: &resolution::Expr) -> (Typ, Constra
         resolution::Expr::TimeSpan(_) => (Typ::Duration, Vec::new()),
         resolution::Expr::Let(expr) => {
             let (val_typ, val_cs) = check_expr(ctx.clone(), &expr.value);
-            let (scope_typ, scope_cs) = check_expr(
-                [(expr.name.clone(), val_typ)]
-                    .into_iter()
-                    .chain(ctx)
-                    .collect(),
-                &expr.scope,
-            );
+            let ctx: Vec<_> = [(expr.name.clone(), val_typ)]
+                .into_iter()
+                .chain(ctx)
+                .collect();
+            let (scope_typ, scope_cs) = check_expr(ctx, &expr.scope);
             (scope_typ, val_cs.into_iter().chain(scope_cs).collect())
         }
         resolution::Expr::BinaryOperation(expr) => {
@@ -112,6 +110,7 @@ pub(crate) fn check_expr(ctx: Context, expr: &resolution::Expr) -> (Typ, Constra
                 .iter()
                 .zip(&args)
                 .map(|(id, typ)| (id.clone(), typ.clone()))
+                .chain(ctx)
                 .collect();
             let (ret_typ, cs) = check_expr(ctx, &expr.body);
             (

@@ -6,6 +6,8 @@ pub(crate) enum Token {
     Num(String),
     TimeLiteral(String, TimeUnit),
     Comma,
+    Semi,
+    Assign,
     LParen,
     RParen,
     LBrace,
@@ -24,6 +26,7 @@ pub(crate) enum Token {
     If,
     Else,
     Fn,
+    Let,
     Eof,
 }
 
@@ -79,6 +82,8 @@ impl<'c> Tokenizer<'c> {
                 },
                 '!' => self.token = Token::Not,
                 ',' => self.token = Token::Comma,
+                ';' => self.token = Token::Semi,
+                '=' => self.token = Token::Assign,
                 '+' => self.token = Token::Plus,
                 '-' => self.token = Token::Minus,
                 '*' => self.token = Token::Mul,
@@ -107,6 +112,7 @@ impl<'c> Tokenizer<'c> {
                         "if" => Token::If,
                         "else" => Token::Else,
                         "fn" => Token::Fn,
+                        "let" => Token::Let,
                         _ => Token::Id(ident),
                     };
                 }
