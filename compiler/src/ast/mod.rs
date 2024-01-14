@@ -30,6 +30,30 @@ pub(crate) enum Expression {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub(crate) struct AstProgram {
+    pub(crate) items: Vec<AstDeclaration>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum AstDeclaration {
+    Fn(AstFnDeclaration),
+    Let(AstLetDeclaration),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct AstFnDeclaration {
+    pub(crate) name: String,
+    pub(crate) params: Vec<String>,
+    pub(crate) body: Expression,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct AstLetDeclaration {
+    pub(crate) name: String,
+    pub(crate) value: Expression,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) enum BinaryOperator {
     Add,
     Sub,

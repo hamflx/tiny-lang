@@ -71,6 +71,48 @@ pub(crate) fn apply_subst(typ: &Typ, subst: &Substituation) -> Typ {
         .clone()
 }
 
+pub(crate) fn check_program(ctx: Context, prog: &resolution::AstProgram) -> Constraints {
+    let (_, cs) = prog
+        .items
+        .iter()
+        .fold((ctx, vec![]), |(mut ctx, constraints), decl| {
+            let (ident, typ, cs) = match decl {
+                resolution::AstDeclaration::Fn(resolution::AstFnDeclaration {
+                    name,
+                    params,
+                    body,
+                }) => {
+                    let param_types: Vec<_> = params.iter().map(|_| new_var()).collect();
+                    let ctx = params
+                        .iter()
+                        .cloned()
+                        .zip(param_types.iter().cloned())
+                        .chain(ctx.clone())
+                        .collect();
+                    let (ret_typ, cs) = check_expr(ctx, body);
+                    (
+                        name,
+                        Typ::Arrow(
+                            ArrowType {
+                                in_typ: param_types,
+                                out_typ: ret_typ,
+                            }
+                            .into(),
+                        ),
+                        cs,
+                    )
+                }
+                resolution::AstDeclaration::Let(let_decl) => {
+                    let (typ, cs) = check_expr(ctx.clone(), &let_decl.value);
+                    (&let_decl.name, typ, cs)
+                }
+            };
+            ctx.insert(0, (ident.clone(), typ));
+            (ctx, cs.into_iter().chain(constraints).collect())
+        });
+    cs
+}
+
 pub(crate) fn check_expr(ctx: Context, expr: &resolution::Expr) -> (Typ, Constraints) {
     match expr {
         resolution::Expr::Var(id) => (

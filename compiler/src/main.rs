@@ -7,12 +7,8 @@ mod semantic;
 mod utils;
 mod vm;
 
-use std::{
-    collections::HashMap,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::time::{SystemTime, UNIX_EPOCH};
 
-use ast::{BinaryOperator, Expression};
 use clap::Parser;
 use compile::build_syscall_stub;
 use parser::parse_code;
@@ -22,58 +18,8 @@ use vm::{CallContext, SysCall, Vm};
 
 use crate::{
     compile::native::run_code_native,
-    semantic::{apply_subst, t_arrow, Typ},
+    semantic::{apply_subst, check_program, t_arrow, Typ},
 };
-
-fn evaluate(expr: &Expression, env: &HashMap<String, isize>) -> isize {
-    match expr {
-        Expression::Var(ident) => env[ident],
-        Expression::CstI(int) => *int,
-        Expression::CstF(_) => todo!(),
-        Expression::CstB(_) => todo!(),
-        Expression::BinaryOperation(expr) => {
-            let left = evaluate(&expr.left, env);
-            let right = evaluate(&expr.right, env);
-            match expr.op {
-                BinaryOperator::Add => left + right,
-                BinaryOperator::Sub => left - right,
-                BinaryOperator::Mul => left * right,
-                BinaryOperator::Div => left / right,
-            }
-        }
-        Expression::Let(_) => todo!(),
-        Expression::Instant(_) => todo!(),
-        Expression::TimeSpan(_) => todo!(),
-        Expression::Fn(_) => todo!(),
-        Expression::App(_, _) => todo!(),
-        Expression::If(_) => todo!(),
-        Expression::Comparison(_) => todo!(),
-        Expression::Logical(_) => todo!(),
-        Expression::Not(_) => todo!(),
-    }
-}
-
-fn evaluate_code(code: &str) -> isize {
-    let expr = parse_code(&code);
-    evaluate(&expr, &HashMap::new())
-}
-
-#[test]
-fn test_evalute() {
-    macro_rules! test_evaluate_code {
-        ($($t:tt)*) => {
-            assert_eq!(evaluate_code(stringify!($($t)*)), $($t)*);
-        };
-    }
-    test_evaluate_code!(1 + 2 * 3);
-    test_evaluate_code!(1 + 2 * -3);
-    test_evaluate_code!(1 + 2 - -3);
-    test_evaluate_code!(1 + 2 * 3 - (5 - 2));
-    test_evaluate_code!(1 + 2 * 3 - -(5 - 2));
-    test_evaluate_code!(1 + 2 * 3 / -(5 - 2));
-    test_evaluate_code!(2 / 3);
-    test_evaluate_code!(8 / 3);
-}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SysVariableTable {
@@ -179,7 +125,7 @@ fn compile_to_byte_code(
 ) -> Vec<u8> {
     let expr = parse_code(code);
     let get_var_record = &sys_calls.rows[get_index];
-    let expr = resolution::compile_with_env(
+    let expr = resolution::compile_program(
         &expr,
         sys_calls
             .rows
@@ -188,8 +134,8 @@ fn compile_to_byte_code(
             .chain(sys_vars.rows.iter().map(|r| r.id.clone()))
             .collect(),
     );
-    let expr = replace_var_with_call(expr, get_var_record.id.clone(), &sys_vars);
-    let (typ, cs) = check_expr(
+    // let expr = replace_var_with_call(expr, get_var_record.id.clone(), &sys_vars);
+    let cs = check_program(
         sys_calls
             .rows
             .iter()
@@ -198,8 +144,8 @@ fn compile_to_byte_code(
         &expr,
     );
     let subst = solve(cs);
-    let typ = apply_subst(&typ, &subst);
-    println!("{}: {:?}", code, typ);
+    // let typ = apply_subst(&typ, &subst);
+    // println!("{}: {:?}", code, typ);
     let stub: Vec<_> = sys_calls
         .rows
         .iter()
@@ -207,7 +153,7 @@ fn compile_to_byte_code(
         .map(|(i, r)| build_syscall_stub(r.id.clone(), i, r.typ.arg_len().unwrap()))
         .flatten()
         .collect();
-    let instrs = compile::compile(expr);
+    let instrs = compile::compile_program(expr);
     let instrs = instrs.into_iter().chain(stub).collect();
     compile::bytecode::compile(instrs)
 }

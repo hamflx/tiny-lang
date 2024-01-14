@@ -8,9 +8,9 @@ use crate::{compile, parser::parse_code, resolution};
 type ExeCodeFn = extern "system" fn() -> usize;
 
 pub(crate) fn run_code_native(code: &str) -> u32 {
-    let expr = parse_code(code);
-    let expr = resolution::compile_with_env(&expr, vec![]);
-    let instrs = compile::compile(expr);
+    let prog = parse_code(code);
+    let expr = resolution::compile_program(&prog, vec![]);
+    let instrs = compile::compile_program(expr);
     let bytes = compile(instrs);
     let mut mem = MmapOptions::new().len(bytes.len()).map_anon().unwrap();
     mem.copy_from_slice(&bytes);

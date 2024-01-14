@@ -1,7 +1,29 @@
 use crate::ast::{
-    BinaryExpression, BinaryOperator, ComparisonExpression, ComparisonOperator, Expression,
-    FnExpression, IfExpression, LetExpression, LogicalExpression, LogicalOperator,
+    AstDeclaration, AstFnDeclaration, AstLetDeclaration, AstProgram, BinaryExpression,
+    BinaryOperator, ComparisonExpression, ComparisonOperator, Expression, FnExpression,
+    IfExpression, LetExpression, LogicalExpression, LogicalOperator,
 };
+
+pub(crate) fn ast_prog(items: &[AstDeclaration]) -> AstProgram {
+    AstProgram {
+        items: items.into_iter().cloned().collect(),
+    }
+}
+
+pub(crate) fn ast_fn(name: &str, params: &[&str], body: Expression) -> AstDeclaration {
+    AstDeclaration::Fn(AstFnDeclaration {
+        name: name.to_string(),
+        params: params.into_iter().map(ToString::to_string).collect(),
+        body,
+    })
+}
+
+pub(crate) fn ast_let(name: &str, value: Expression) -> AstDeclaration {
+    AstDeclaration::Let(AstLetDeclaration {
+        name: name.to_string(),
+        value,
+    })
+}
 
 pub(crate) fn id(name: String) -> Expression {
     Expression::Var(name)

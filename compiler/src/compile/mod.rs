@@ -3,7 +3,10 @@ pub(crate) mod native;
 
 use crate::{
     ast::{BinaryOperator, ComparisonOperator, LogicalOperator},
-    resolution::{self, make_identifier, Identifier},
+    resolution::{
+        self, make_identifier, BinaryExpression, ComparisonExpression, Expr, Identifier,
+        IfExpression, LetExpression, LogicalExpression,
+    },
     utils::expression::{app_fn, integer, let_expr, let_fn, op_add, op_mul, op_sub, var},
 };
 
@@ -14,105 +17,17 @@ struct Fun {
     body: Expr,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) enum Expr {
-    Var(Identifier),
-    CstI(isize),
-    CstF(f64),
-    CstB(bool),
-    Instant(usize),
-    TimeSpan(usize),
-    Let(Box<LetExpression>),
-    App(Identifier, Vec<Expr>),
-    If(Box<IfExpression>),
-    BinaryOperation(Box<BinaryExpression>),
-    ComparisonExpression(Box<ComparisonExpression>),
-    Logical(Box<LogicalExpression>),
-    Not(Box<Expr>),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct BinaryExpression {
-    pub(crate) op: BinaryOperator,
-    pub(crate) left: Expr,
-    pub(crate) right: Expr,
-}
-
-impl BinaryExpression {
-    fn new(op: BinaryOperator, left: Expr, right: Expr) -> Self {
-        Self { op, left, right }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct ComparisonExpression {
-    pub(crate) op: ComparisonOperator,
-    pub(crate) left: Expr,
-    pub(crate) right: Expr,
-}
-
-impl ComparisonExpression {
-    pub(crate) fn new(op: ComparisonOperator, left: Expr, right: Expr) -> Self {
-        Self { op, left, right }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct LogicalExpression {
-    pub(crate) op: LogicalOperator,
-    pub(crate) left: Expr,
-    pub(crate) right: Expr,
-}
-
-impl LogicalExpression {
-    pub(crate) fn new(op: LogicalOperator, left: Expr, right: Expr) -> Self {
-        Self { op, left, right }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct LessEqualExpression {
-    pub(crate) left: Expr,
-    pub(crate) right: Expr,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct IfExpression {
-    pub(crate) condition: Expr,
-    pub(crate) then: Expr,
-    pub(crate) other: Expr,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct CallExpression {
-    pub(crate) callee: Identifier,
-    pub(crate) args: Vec<Expr>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct FnExpression {
-    pub(crate) params: Vec<Identifier>,
-    pub(crate) body: Expr,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct LetExpression {
-    pub(crate) name: Identifier,
-    pub(crate) value: Expr,
-    pub(crate) scope: Expr,
-}
-
-fn extract_fun(expr: resolution::Expr) -> (Expr, Vec<Fun>) {
+fn extract_fun(expr: Expr) -> (Expr, Vec<Fun>) {
     match expr {
-        resolution::Expr::Var(v) => (Expr::Var(v), Vec::new()),
-        resolution::Expr::CstI(i) => (Expr::CstI(i), Vec::new()),
-        resolution::Expr::CstF(f) => (Expr::CstF(f), Vec::new()),
-        resolution::Expr::CstB(b) => (Expr::CstB(b), Vec::new()),
-        resolution::Expr::Instant(i) => (Expr::Instant(i), Vec::new()),
-        resolution::Expr::TimeSpan(t) => (Expr::TimeSpan(t), Vec::new()),
-        resolution::Expr::Fn(_) => unimplemented!(),
-        resolution::Expr::Let(l) => match l.value {
-            resolution::Expr::Fn(f) => {
+        Expr::Var(v) => (Expr::Var(v), Vec::new()),
+        Expr::CstI(i) => (Expr::CstI(i), Vec::new()),
+        Expr::CstF(f) => (Expr::CstF(f), Vec::new()),
+        Expr::CstB(b) => (Expr::CstB(b), Vec::new()),
+        Expr::Instant(i) => (Expr::Instant(i), Vec::new()),
+        Expr::TimeSpan(t) => (Expr::TimeSpan(t), Vec::new()),
+        Expr::Fn(_) => unimplemented!(),
+        Expr::Let(l) => match l.value {
+            Expr::Fn(f) => {
                 let (fn_body, value_fns) = extract_fun(f.body);
                 let (main, scope_funs) = extract_fun(l.scope);
                 (
@@ -147,7 +62,7 @@ fn extract_fun(expr: resolution::Expr) -> (Expr, Vec<Fun>) {
                 )
             }
         },
-        resolution::Expr::App(p, args) => {
+        Expr::App(p, args) => {
             let (args, funs) = args.into_iter().fold(
                 (Vec::new(), Vec::new()),
                 |(mut expr_list, mut fun_list), p| {
@@ -159,7 +74,7 @@ fn extract_fun(expr: resolution::Expr) -> (Expr, Vec<Fun>) {
             );
             (Expr::App(p, args), funs)
         }
-        resolution::Expr::If(e) => {
+        Expr::If(e) => {
             let (condition, funs_cond) = extract_fun(e.condition);
             let (then, funs_then) = extract_fun(e.then);
             let (other, funs_other) = extract_fun(e.other);
@@ -179,7 +94,7 @@ fn extract_fun(expr: resolution::Expr) -> (Expr, Vec<Fun>) {
                     .collect(),
             )
         }
-        resolution::Expr::BinaryOperation(e) => {
+        Expr::BinaryOperation(e) => {
             let (left, funs_left) = extract_fun(e.left);
             let (right, funs_right) = extract_fun(e.right);
             (
@@ -194,11 +109,11 @@ fn extract_fun(expr: resolution::Expr) -> (Expr, Vec<Fun>) {
                 funs_left.into_iter().chain(funs_right).collect(),
             )
         }
-        resolution::Expr::Comparison(e) => {
+        Expr::Comparison(e) => {
             let (left, funs_left) = extract_fun(e.left);
             let (right, funs_right) = extract_fun(e.right);
             (
-                Expr::ComparisonExpression(
+                Expr::Comparison(
                     ComparisonExpression {
                         op: e.op,
                         left,
@@ -209,7 +124,7 @@ fn extract_fun(expr: resolution::Expr) -> (Expr, Vec<Fun>) {
                 funs_left.into_iter().chain(funs_right).collect(),
             )
         }
-        resolution::Expr::Logical(expr) => {
+        Expr::Logical(expr) => {
             let (left, funs_left) = extract_fun(expr.left);
             let (right, funs_right) = extract_fun(expr.right);
             (
@@ -224,7 +139,7 @@ fn extract_fun(expr: resolution::Expr) -> (Expr, Vec<Fun>) {
                 funs_left.into_iter().chain(funs_right).collect(),
             )
         }
-        resolution::Expr::Not(expr) => {
+        Expr::Not(expr) => {
             let (expr, funs) = extract_fun(*expr);
             (Expr::Not(expr.into()), funs)
         }
@@ -417,7 +332,7 @@ fn compile_expr(expr: Expr, stack: Vec<StackValue>) -> Vec<Instruction> {
                 .chain([op_instr])
                 .collect()
         }
-        Expr::ComparisonExpression(expr) => {
+        Expr::Comparison(expr) => {
             let left_instrs = compile_expr(expr.left, stack.clone());
             let right_instrs = compile_expr(
                 expr.right,
@@ -455,6 +370,7 @@ fn compile_expr(expr: Expr, stack: Vec<StackValue>) -> Vec<Instruction> {
             let instrs = compile_expr(*expr, stack);
             instrs.into_iter().chain([Instruction::Not]).collect()
         }
+        Expr::Fn(_) => unreachable!(),
     }
 }
 
@@ -480,7 +396,7 @@ pub(crate) fn build_syscall_stub(name: Identifier, no: usize, len: usize) -> Vec
         .collect()
 }
 
-pub(crate) fn compile(expr: resolution::Expr) -> Vec<Instruction> {
+pub(crate) fn compile(expr: Expr) -> Vec<Instruction> {
     let (main_expr, fun_list) = extract_fun(expr);
     let main_ident = make_identifier("main".to_string());
     let main_fun = Fun {
@@ -495,6 +411,45 @@ pub(crate) fn compile(expr: resolution::Expr) -> Vec<Instruction> {
         .flatten()
         .collect::<Vec<_>>();
     [Instruction::Call(main_ident, 0), Instruction::Exit]
+        .into_iter()
+        .chain(fun_instrs)
+        .collect()
+}
+
+fn extract_prog_fun(prog: resolution::AstProgram) -> Vec<Fun> {
+    prog.items
+        .into_iter()
+        .map(|decl| match decl {
+            resolution::AstDeclaration::Fn(fn_decl) => Fun {
+                ident: fn_decl.name,
+                params: fn_decl.params,
+                body: fn_decl.body,
+            },
+            resolution::AstDeclaration::Let(_) => todo!(),
+        })
+        .collect()
+}
+
+pub(crate) fn compile_program(prog: resolution::AstProgram) -> Vec<Instruction> {
+    let fun_list = extract_prog_fun(prog);
+    let main = fun_list
+        .iter()
+        .find(|f| f.ident.name == "main")
+        .ok_or("No `main`")
+        .unwrap();
+    let start_ident = make_identifier("start".to_string());
+    let start_fun = Fun {
+        ident: start_ident.clone(),
+        body: Expr::App(main.ident.clone(), vec![]),
+        params: Vec::new(),
+    };
+    let fun_instrs = [start_fun]
+        .into_iter()
+        .chain(fun_list)
+        .map(|f| compile_fun(f))
+        .flatten()
+        .collect::<Vec<_>>();
+    [Instruction::Call(start_ident, 0), Instruction::Exit]
         .into_iter()
         .chain(fun_instrs)
         .collect()

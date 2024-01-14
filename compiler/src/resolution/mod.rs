@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::{
-    ast::{BinaryOperator, ComparisonOperator, Expression, LogicalOperator},
+    ast::{self, BinaryOperator, ComparisonOperator, Expression, LogicalOperator},
     utils::expression::{app_fn, integer, let_expr, let_fn, op_mul, op_sub, var},
 };
 
@@ -9,6 +9,36 @@ use crate::{
 pub(crate) struct Identifier {
     pub(crate) name: String,
     pub(crate) stamp: usize,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct AstProgram {
+    pub(crate) items: Vec<AstDeclaration>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum AstDeclaration {
+    Fn(AstFnDeclaration),
+    Let(AstLetDeclaration),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct AstFnDeclaration {
+    pub(crate) name: Identifier,
+    pub(crate) params: Vec<Identifier>,
+    pub(crate) body: Expr,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct AstLetDeclaration {
+    pub(crate) name: Identifier,
+    pub(crate) value: Expr,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum AstStatement {
+    Decl(AstDeclaration),
+    Expr(Expr),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -151,7 +181,12 @@ fn compile_impl(expr: &Expression, env: Vec<Identifier>) -> Expr {
             Expr::Fn(FnExpression { params, body }.into())
         }
         Expression::App(name, args) => {
-            let id = env.iter().find(|i| i.name == *name).unwrap().clone();
+            let id = env
+                .iter()
+                .find(|i| i.name == *name)
+                .ok_or_else(|| format!("Identifier {} not found", name))
+                .unwrap()
+                .clone();
             Expr::App(
                 id,
                 args.iter().map(|e| compile_impl(e, env.clone())).collect(),
@@ -191,6 +226,57 @@ pub(crate) fn compile(expr: &Expression) -> Expr {
 
 pub(crate) fn compile_with_env(expr: &Expression, env: Vec<Identifier>) -> Expr {
     compile_impl(expr, env)
+}
+
+pub(crate) fn compile_program(prog: &ast::AstProgram, env: Vec<Identifier>) -> AstProgram {
+    let (items, _) = prog.items.iter().fold(
+        (Vec::<AstDeclaration>::new(), env),
+        |(mut decls, mut env), decl| {
+            let item = compile_declaration(decl, env.clone());
+            let decl_name = match &item {
+                AstDeclaration::Fn(f) => &f.name,
+                AstDeclaration::Let(l) => &l.name,
+            };
+            env.insert(0, decl_name.clone());
+            decls.push(item);
+            (decls, env)
+        },
+    );
+    AstProgram { items }
+}
+
+pub(crate) fn compile_declaration(
+    decl: &ast::AstDeclaration,
+    env: Vec<Identifier>,
+) -> AstDeclaration {
+    match decl {
+        ast::AstDeclaration::Fn(fn_decl) => {
+            let fn_ident = make_identifier(fn_decl.name.to_string());
+            let params: Vec<_> = fn_decl
+                .params
+                .iter()
+                .map(|p| make_identifier(p.to_string()))
+                .collect();
+            let env = [fn_ident.clone()]
+                .into_iter()
+                .chain(params.clone())
+                .chain(env)
+                .collect();
+            let body = compile_impl(&fn_decl.body, env);
+            AstDeclaration::Fn(AstFnDeclaration {
+                name: fn_ident.clone(),
+                params,
+                body,
+            })
+        }
+        ast::AstDeclaration::Let(let_decl) => {
+            let ident = make_identifier(let_decl.name.to_string());
+            AstDeclaration::Let(AstLetDeclaration {
+                name: ident,
+                value: compile_impl(&let_decl.value, env),
+            })
+        }
+    }
 }
 
 #[test]

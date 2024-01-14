@@ -1,7 +1,7 @@
 fn hello () {
-  1+1
+  1+2
 }
 
 fn main () {
-  hello()
+  hello()+10086
 }

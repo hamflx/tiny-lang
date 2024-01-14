@@ -1,23 +1,23 @@
 use crate::{
-    ast::Expression,
+    ast::{AstDeclaration, AstFnDeclaration, AstLetDeclaration, AstProgram, Expression},
     lexer::{Token, Tokenizer},
     utils::expression::{
-        call_expr, fn_expr, if_expr, integer, let_expr, op_add, op_and, op_div, op_ge, op_gt,
-        op_le, op_lt, op_mul, op_not, op_or, op_sub,
+        ast_fn, ast_prog, call_expr, fn_expr, if_expr, integer, let_expr, op_add, op_and, op_div,
+        op_ge, op_gt, op_le, op_lt, op_mul, op_not, op_or, op_sub,
     },
 };
 
 #[test]
 fn test_parser() {
     assert_eq!(
-        parse_code("1 + 2 * -3"),
+        parse_expr_code("1 + 2 * -3"),
         op_add(
             integer(1),
             op_mul(integer(2), op_sub(integer(0), integer(3)))
         )
     );
     assert_eq!(
-        parse_code("1 + 2 * (3 - 4) > 3"),
+        parse_expr_code("1 + 2 * (3 - 4) > 3"),
         op_gt(
             op_add(
                 integer(1),
@@ -27,18 +27,18 @@ fn test_parser() {
         )
     );
     assert_eq!(
-        parse_code("if 3 > 2 { 1 } else {0}"),
+        parse_expr_code("if 3 > 2 { 1 } else {0}"),
         if_expr(op_gt(integer(3), integer(2)), integer(1), integer(0))
     );
     assert_eq!(
-        parse_code("5 + if 3 > 2 { 1 } else {0}"),
+        parse_expr_code("5 + if 3 > 2 { 1 } else {0}"),
         op_add(
             integer(5),
             if_expr(op_gt(integer(3), integer(2)), integer(1), integer(0))
         )
     );
     assert_eq!(
-        parse_code("log(now() + 5)"),
+        parse_expr_code("log(now() + 5)"),
         call_expr(
             "log".into(),
             vec![op_add(call_expr("now".into(), vec![]), integer(5))]
@@ -47,60 +47,49 @@ fn test_parser() {
 }
 
 #[test]
-fn test_parser_fn() {
-    assert_eq!(
-        parse_code("fn hello(){1} hello()"),
-        let_expr(
-            "hello",
-            fn_expr(&[], integer(1)),
-            call_expr("hello".to_string(), vec![]),
-        )
-    );
-}
-
-#[test]
 fn test_parser_fn_main() {
     assert_eq!(
         parse_code("fn hello() {1} fn main(){hello()}"),
-        let_expr(
-            "hello",
-            fn_expr(&[], integer(1)),
-            let_expr(
-                "main",
-                fn_expr(&[], call_expr("hello".to_string(), vec![])),
-                call_expr("main".to_string(), vec![]),
-            ),
-        )
+        ast_prog(&[
+            ast_fn("hello", &[], integer(1)),
+            ast_fn("main", &[], call_expr("hello".to_string(), vec![])),
+        ])
     );
 }
 
-pub(crate) fn parse_code(code: &str) -> Expression {
+pub(crate) fn parse_code(code: &str) -> AstProgram {
     let mut tokenizer = Tokenizer::new(code);
     tokenizer.advance();
     parseP(&mut tokenizer)
+}
+
+pub(crate) fn parse_expr_code(code: &str) -> Expression {
+    let mut tokenizer = Tokenizer::new(code);
+    tokenizer.advance();
+    parse_expr(&mut tokenizer)
 }
 
 fn err(expected: &[&str], got: &Token) -> ! {
     panic!("Expected: {:?}, but got {:?}", expected, got)
 }
 
-pub(crate) fn parseP(tokenizer: &mut Tokenizer) -> Expression {
+pub(crate) fn parse_expr(tokenizer: &mut Tokenizer) -> Expression {
+    let expr = parseE(tokenizer);
+    tokenizer.eat(Token::Eof);
+    expr
+}
+
+pub(crate) fn parseP(tokenizer: &mut Tokenizer) -> AstProgram {
     match tokenizer.token() {
         Token::Eof | Token::Fn | Token::Let => {
             let e0 = parseItems(tokenizer, vec![]);
             tokenizer.eat(Token::Eof);
-            e0.into_iter().rev().fold(
-                call_expr("main".to_string(), vec![]),
-                |scope, (id, body)| let_expr(&id, body, scope),
-            )
+            AstProgram { items: e0 }
         }
         tok => err(&["$", "fn", "let"], &tok),
     }
 }
-fn parseItems(
-    tokenizer: &mut Tokenizer,
-    prefix: Vec<(String, Expression)>,
-) -> Vec<(String, Expression)> {
+fn parseItems(tokenizer: &mut Tokenizer, prefix: Vec<AstDeclaration>) -> Vec<AstDeclaration> {
     match tokenizer.token() {
         Token::Eof => prefix,
         Token::Fn | Token::Let => {
@@ -111,14 +100,14 @@ fn parseItems(
         tok => err(&["$", "fn", "let"], &tok),
     }
 }
-fn parseItem(tokenizer: &mut Tokenizer) -> (String, Expression) {
+fn parseItem(tokenizer: &mut Tokenizer) -> AstDeclaration {
     match tokenizer.token() {
         Token::Fn => parseFn(tokenizer),
         Token::Let => parseLet(tokenizer),
         tok => err(&["fn", "let"], &tok),
     }
 }
-fn parseLet(tokenizer: &mut Tokenizer) -> (String, Expression) {
+fn parseLet(tokenizer: &mut Tokenizer) -> AstDeclaration {
     match tokenizer.token() {
         Token::Let => {
             tokenizer.eat(Token::Let);
@@ -130,12 +119,15 @@ fn parseLet(tokenizer: &mut Tokenizer) -> (String, Expression) {
             tokenizer.eat(Token::Assign);
             let e3 = parseE(tokenizer);
             tokenizer.eat(Token::Semi);
-            (id, e3)
+            AstDeclaration::Let(AstLetDeclaration {
+                name: id,
+                value: e3,
+            })
         }
         tok => err(&["let"], &tok),
     }
 }
-fn parseFn(tokenizer: &mut Tokenizer) -> (String, Expression) {
+fn parseFn(tokenizer: &mut Tokenizer) -> AstDeclaration {
     match tokenizer.token() {
         Token::Fn => {
             tokenizer.eat(Token::Fn);
@@ -150,7 +142,11 @@ fn parseFn(tokenizer: &mut Tokenizer) -> (String, Expression) {
             tokenizer.eat(Token::LBrace);
             let e6 = parseE(tokenizer);
             tokenizer.eat(Token::RBrace);
-            (id, fn_expr(&e3, e6))
+            AstDeclaration::Fn(AstFnDeclaration {
+                name: id,
+                params: e3,
+                body: e6,
+            })
         }
         tok => err(&["fn"], &tok),
     }
