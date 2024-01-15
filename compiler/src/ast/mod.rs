@@ -1,3 +1,5 @@
+use crate::semantic::Typ;
+
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct LetExpression {
     pub(crate) name: String,
@@ -43,7 +45,8 @@ pub(crate) enum AstDeclaration {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct AstFnDeclaration {
     pub(crate) name: String,
-    pub(crate) params: Vec<String>,
+    pub(crate) params: Vec<(String, Typ)>,
+    pub(crate) typ: Typ,
     pub(crate) body: Expression,
 }
 

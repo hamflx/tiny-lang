@@ -255,7 +255,7 @@ pub(crate) fn compile_declaration(
             let params: Vec<_> = fn_decl
                 .params
                 .iter()
-                .map(|p| make_identifier(p.to_string()))
+                .map(|(p, _)| make_identifier(p.to_string()))
                 .collect();
             let env = [fn_ident.clone()]
                 .into_iter()

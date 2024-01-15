@@ -15,25 +15,36 @@ type Substituation = Vec<(usize, Typ)>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Typ {
+    Unit,
     Int,
     Bool,
     Instant,
     Duration,
+    String,
     Var(usize),
+    Record(RecordType),
     Arrow(Box<ArrowType>),
 }
 
 impl Typ {
     pub fn arg_len(&self) -> Option<usize> {
         match self {
+            Typ::Unit => None,
             Typ::Int => None,
             Typ::Bool => None,
             Typ::Instant => None,
             Typ::Duration => None,
+            Typ::String => None,
             Typ::Var(_) => None,
+            Typ::Record(_) => None,
             Typ::Arrow(arrow) => Some(arrow.in_typ.len()),
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RecordType {
+    pub(crate) fields: Vec<(String, Typ)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

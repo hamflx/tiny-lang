@@ -5,7 +5,9 @@ pub(crate) enum Token {
     Id(String),
     Num(String),
     TimeLiteral(String, TimeUnit),
+    Arrow,
     Comma,
+    Colon,
     Semi,
     Assign,
     LParen,
@@ -27,6 +29,10 @@ pub(crate) enum Token {
     Else,
     Fn,
     Let,
+    Bool,
+    ISize,
+    USize,
+    String,
     Eof,
 }
 
@@ -82,10 +88,14 @@ impl<'c> Tokenizer<'c> {
                 },
                 '!' => self.token = Token::Not,
                 ',' => self.token = Token::Comma,
+                ':' => self.token = Token::Colon,
                 ';' => self.token = Token::Semi,
                 '=' => self.token = Token::Assign,
                 '+' => self.token = Token::Plus,
-                '-' => self.token = Token::Minus,
+                '-' => match self.code.next_if(|ch| *ch == '>') {
+                    Some(_) => self.token = Token::Arrow,
+                    None => self.token = Token::Minus,
+                },
                 '*' => self.token = Token::Mul,
                 '/' => self.token = Token::Div,
                 '<' => match self.code.next_if(|ch| *ch == '=') {
@@ -113,6 +123,10 @@ impl<'c> Tokenizer<'c> {
                         "else" => Token::Else,
                         "fn" => Token::Fn,
                         "let" => Token::Let,
+                        "bool" => Token::Bool,
+                        "isize" => Token::ISize,
+                        "usize" => Token::USize,
+                        "string" => Token::String,
                         _ => Token::Id(ident),
                     };
                 }

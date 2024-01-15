@@ -1,6 +1,7 @@
 use crate::{
     ast::{AstDeclaration, AstFnDeclaration, AstLetDeclaration, AstProgram, Expression},
     lexer::{Token, Tokenizer},
+    semantic::{RecordType, Typ},
     utils::expression::{
         ast_fn, ast_prog, call_expr, fn_expr, if_expr, integer, let_expr, op_add, op_and, op_div,
         op_ge, op_gt, op_le, op_lt, op_mul, op_not, op_or, op_sub,
@@ -49,10 +50,15 @@ fn test_parser() {
 #[test]
 fn test_parser_fn_main() {
     assert_eq!(
-        parse_code("fn hello() {1} fn main(){hello()}"),
+        parse_code("fn hello() -> usize {1} fn main()-> usize{hello()}"),
         ast_prog(&[
-            ast_fn("hello", &[], integer(1)),
-            ast_fn("main", &[], call_expr("hello".to_string(), vec![])),
+            ast_fn("hello", &[], Typ::Int, integer(1)),
+            ast_fn(
+                "main",
+                &[],
+                Typ::Int,
+                call_expr("hello".to_string(), vec![])
+            ),
         ])
     );
 }
@@ -87,6 +93,70 @@ pub(crate) fn parseP(tokenizer: &mut Tokenizer) -> AstProgram {
             AstProgram { items: e0 }
         }
         tok => err(&["$", "fn", "let"], &tok),
+    }
+}
+fn parseType(tokenizer: &mut Tokenizer) -> Typ {
+    match tokenizer.token() {
+        Token::Bool => {
+            tokenizer.eat(Token::Bool);
+            Typ::Bool
+        }
+        Token::ISize => {
+            tokenizer.eat(Token::ISize);
+            Typ::Int
+        }
+        Token::LBrace => parseRecord(tokenizer),
+        Token::LParen => {
+            tokenizer.eat(Token::LParen);
+            tokenizer.eat(Token::RParen);
+            Typ::Unit
+        }
+        Token::String => {
+            tokenizer.eat(Token::String);
+            Typ::String
+        }
+        Token::USize => {
+            tokenizer.eat(Token::USize);
+            Typ::Int
+        }
+        tok => err(&["(", "bool", "isize", "string", "usize", "{"], &tok),
+    }
+}
+fn parseRecord(tokenizer: &mut Tokenizer) -> Typ {
+    match tokenizer.token() {
+        Token::LBrace => {
+            tokenizer.eat(Token::LBrace);
+            let e1 = parseRecordFields(tokenizer, vec![]);
+            tokenizer.eat(Token::RBrace);
+            Typ::Record(RecordType { fields: e1 })
+        }
+        tok => err(&["{"], &tok),
+    }
+}
+fn parseRecordFields(tokenizer: &mut Tokenizer, prefix: Vec<(String, Typ)>) -> Vec<(String, Typ)> {
+    match tokenizer.token() {
+        Token::Id(_) => {
+            let e0 = parseRecordFieldItem(tokenizer);
+            tokenizer.eat(Token::Comma);
+            let e2 = parseRecordFields(tokenizer, prefix.into_iter().chain([e0]).collect());
+            e2
+        }
+        Token::RBrace => prefix,
+        tok => err(&["id", "}"], &tok),
+    }
+}
+fn parseRecordFieldItem(tokenizer: &mut Tokenizer) -> (String, Typ) {
+    match tokenizer.token() {
+        Token::Id(_) => {
+            let id = match tokenizer.token() {
+                Token::Id(id) => id.to_string(),
+                tok => err(&["id"], &tok),
+            };
+            tokenizer.eat(Token::Colon);
+            let e2 = parseType(tokenizer);
+            (id, e2)
+        }
+        tok => err(&["id"], &tok),
     }
 }
 fn parseItems(tokenizer: &mut Tokenizer, prefix: Vec<AstDeclaration>) -> Vec<AstDeclaration> {
@@ -139,26 +209,52 @@ fn parseFn(tokenizer: &mut Tokenizer) -> AstDeclaration {
             tokenizer.eat(Token::LParen);
             let e3 = parseFnArgsOpt(tokenizer);
             tokenizer.eat(Token::RParen);
+            tokenizer.eat(Token::Arrow);
+            let e6 = parseType(tokenizer);
             tokenizer.eat(Token::LBrace);
-            let e6 = parseE(tokenizer);
+            let e8 = parseE(tokenizer);
             tokenizer.eat(Token::RBrace);
             AstDeclaration::Fn(AstFnDeclaration {
                 name: id,
                 params: e3,
-                body: e6,
+                typ: e6,
+                body: e8,
             })
         }
         tok => err(&["fn"], &tok),
     }
 }
-fn parseFnArgsOpt(tokenizer: &mut Tokenizer) -> Vec<String> {
+fn parseFnArgsOpt(tokenizer: &mut Tokenizer) -> Vec<(String, Typ)> {
     match tokenizer.token() {
-        Token::Id(_) => parseFnArgs(tokenizer),
+        Token::Id(_) => {
+            let e0 = parseFnArgs(tokenizer);
+            e0
+        }
         Token::RParen => Vec::new(),
-        tok => err(&["id", ")"], &tok),
+        tok => err(&[")", "id"], &tok),
     }
 }
-fn parseFnArgs(tokenizer: &mut Tokenizer) -> Vec<String> {
+fn parseFnArgs(tokenizer: &mut Tokenizer) -> Vec<(String, Typ)> {
+    match tokenizer.token() {
+        Token::Id(_) => {
+            let e0 = parseFnArg(tokenizer);
+            parseFnArgs_(tokenizer, vec![e0])
+        }
+        tok => err(&["id"], &tok),
+    }
+}
+fn parseFnArgs_(tokenizer: &mut Tokenizer, prefix: Vec<(String, Typ)>) -> Vec<(String, Typ)> {
+    match tokenizer.token() {
+        Token::Comma => {
+            tokenizer.eat(Token::Comma);
+            let e1 = parseFnArg(tokenizer);
+            parseFnArgs_(tokenizer, prefix.into_iter().chain([e1]).collect())
+        }
+        Token::RParen => prefix,
+        tok => err(&[")", ","], &tok),
+    }
+}
+fn parseFnArg(tokenizer: &mut Tokenizer) -> (String, Typ) {
     match tokenizer.token() {
         Token::Id(_) => {
             let id = match tokenizer.token() {
@@ -166,24 +262,11 @@ fn parseFnArgs(tokenizer: &mut Tokenizer) -> Vec<String> {
                 tok => err(&["id"], &tok),
             };
             tokenizer.advance();
-            parseFnArgs_(tokenizer, vec![id])
+            tokenizer.eat(Token::Colon);
+            let e2 = parseType(tokenizer);
+            (id, e2)
         }
         tok => err(&["id"], &tok),
-    }
-}
-fn parseFnArgs_(tokenizer: &mut Tokenizer, prefix: Vec<String>) -> Vec<String> {
-    match tokenizer.token() {
-        Token::Comma => {
-            tokenizer.eat(Token::Comma);
-            let id = match tokenizer.token() {
-                Token::Id(id) => id.to_string(),
-                tok => err(&["id"], &tok),
-            };
-            tokenizer.advance();
-            parseFnArgs_(tokenizer, prefix.into_iter().chain([id]).collect())
-        }
-        Token::RParen => prefix,
-        tok => err(&[")", ","], &tok),
     }
 }
 fn parseE(tokenizer: &mut Tokenizer) -> Expression {
@@ -192,7 +275,7 @@ fn parseE(tokenizer: &mut Tokenizer) -> Expression {
             let e0 = parseO(tokenizer);
             parseE_(tokenizer, e0)
         }
-        tok => err(&["id", "!", "(", "-", "if", "num"], &tok),
+        tok => err(&["(", "id", "!", "-", "if", "num"], &tok),
     }
 }
 fn parseE_(tokenizer: &mut Tokenizer, prefix: Expression) -> Expression {
@@ -203,7 +286,7 @@ fn parseE_(tokenizer: &mut Tokenizer, prefix: Expression) -> Expression {
             let e1 = parseO(tokenizer);
             parseE_(tokenizer, op_or(prefix, e1))
         }
-        tok => err(&[")", ",", ";", "{", "}", "||"], &tok),
+        tok => err(&["{", ")", ",", "}", ";", "||"], &tok),
     }
 }
 fn parseO(tokenizer: &mut Tokenizer) -> Expression {
@@ -212,7 +295,7 @@ fn parseO(tokenizer: &mut Tokenizer) -> Expression {
             let e0 = parseA(tokenizer);
             parseO_(tokenizer, e0)
         }
-        tok => err(&["id", "!", "(", "-", "if", "num"], &tok),
+        tok => err(&["(", "id", "!", "-", "if", "num"], &tok),
     }
 }
 fn parseO_(tokenizer: &mut Tokenizer, prefix: Expression) -> Expression {
@@ -225,7 +308,7 @@ fn parseO_(tokenizer: &mut Tokenizer, prefix: Expression) -> Expression {
         Token::Comma | Token::LBrace | Token::Or | Token::RBrace | Token::RParen | Token::Semi => {
             prefix
         }
-        tok => err(&[")", ",", ";", "{", "}", "||", "&&"], &tok),
+        tok => err(&["{", ")", ",", "}", ";", "||", "&&"], &tok),
     }
 }
 fn parseA(tokenizer: &mut Tokenizer) -> Expression {
@@ -234,7 +317,7 @@ fn parseA(tokenizer: &mut Tokenizer) -> Expression {
             let e0 = parseB(tokenizer);
             parseA_(tokenizer, e0)
         }
-        tok => err(&["id", "!", "(", "-", "if", "num"], &tok),
+        tok => err(&["(", "id", "!", "-", "if", "num"], &tok),
     }
 }
 fn parseA_(tokenizer: &mut Tokenizer, prefix: Expression) -> Expression {
@@ -267,7 +350,7 @@ fn parseA_(tokenizer: &mut Tokenizer, prefix: Expression) -> Expression {
             parseA_(tokenizer, op_lt(prefix, e1))
         }
         tok => err(
-            &[")", ",", ";", "{", "}", "||", "&&", "<", "<=", ">", ">="],
+            &["{", ")", ",", "}", ";", "||", "&&", "<", "<=", ">", ">="],
             &tok,
         ),
     }
@@ -278,7 +361,7 @@ fn parseB(tokenizer: &mut Tokenizer) -> Expression {
             let e0 = parseT(tokenizer);
             parseB_(tokenizer, e0)
         }
-        tok => err(&["id", "!", "(", "-", "if", "num"], &tok),
+        tok => err(&["(", "id", "!", "-", "if", "num"], &tok),
     }
 }
 fn parseB_(tokenizer: &mut Tokenizer, prefix: Expression) -> Expression {
@@ -306,7 +389,7 @@ fn parseB_(tokenizer: &mut Tokenizer, prefix: Expression) -> Expression {
         }
         tok => err(
             &[
-                ")", ",", ";", "{", "}", "||", "&&", "<", "<=", ">", ">=", "-", "+",
+                "{", ")", ",", "}", ";", "||", "&&", "<", "<=", ">", ">=", "-", "+",
             ],
             &tok,
         ),
@@ -318,7 +401,7 @@ fn parseT(tokenizer: &mut Tokenizer) -> Expression {
             let e0 = parseF(tokenizer);
             parseT_(tokenizer, e0)
         }
-        tok => err(&["id", "!", "(", "-", "if", "num"], &tok),
+        tok => err(&["(", "id", "!", "-", "if", "num"], &tok),
     }
 }
 fn parseT_(tokenizer: &mut Tokenizer, prefix: Expression) -> Expression {
@@ -348,7 +431,7 @@ fn parseT_(tokenizer: &mut Tokenizer, prefix: Expression) -> Expression {
         }
         tok => err(
             &[
-                ")", ",", "-", ";", "{", "}", "||", "&&", "<", "<=", ">", ">=", "+", "*", "/",
+                "{", ")", ",", "}", "-", ";", "||", "&&", "<", "<=", ">", ">=", "+", "*", "/",
             ],
             &tok,
         ),
@@ -370,7 +453,7 @@ fn parseF(tokenizer: &mut Tokenizer) -> Expression {
             let e1 = parseN(tokenizer);
             op_not(e1)
         }
-        tok => err(&["id", "(", "if", "num", "!", "-"], &tok),
+        tok => err(&["(", "id", "if", "num", "!", "-"], &tok),
     }
 }
 fn parseN(tokenizer: &mut Tokenizer) -> Expression {
@@ -404,7 +487,7 @@ fn parseN(tokenizer: &mut Tokenizer) -> Expression {
             tokenizer.advance();
             expr
         }
-        tok => err(&["id", "(", "if", "num"], &tok),
+        tok => err(&["(", "id", "if", "num"], &tok),
     }
 }
 fn parseI(tokenizer: &mut Tokenizer, callee: String) -> Expression {
@@ -432,7 +515,7 @@ fn parseI(tokenizer: &mut Tokenizer, callee: String) -> Expression {
         }
         tok => err(
             &[
-                ")", ",", "-", ";", "{", "}", "||", "&&", "<", "<=", ">", ">=", "+", "*", "/", "(",
+                "(", "{", ")", ",", "}", "-", ";", "||", "&&", "<", "<=", ">", ">=", "+", "*", "/",
             ],
             &tok,
         ),
@@ -444,7 +527,7 @@ fn parseL(tokenizer: &mut Tokenizer) -> Vec<Expression> {
             parseM(tokenizer)
         }
         Token::RParen => Vec::new(),
-        tok => err(&["id", "!", "(", "-", "if", "num", ")"], &tok),
+        tok => err(&["(", "id", "!", "-", "if", "num", ")"], &tok),
     }
 }
 fn parseM(tokenizer: &mut Tokenizer) -> Vec<Expression> {
@@ -453,7 +536,7 @@ fn parseM(tokenizer: &mut Tokenizer) -> Vec<Expression> {
             let e0 = parseE(tokenizer);
             parseM_(tokenizer, vec![e0])
         }
-        tok => err(&["id", "!", "(", "-", "if", "num"], &tok),
+        tok => err(&["(", "id", "!", "-", "if", "num"], &tok),
     }
 }
 fn parseM_(tokenizer: &mut Tokenizer, prefix: Vec<Expression>) -> Vec<Expression> {

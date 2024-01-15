@@ -1,7 +1,10 @@
-use crate::ast::{
-    AstDeclaration, AstFnDeclaration, AstLetDeclaration, AstProgram, BinaryExpression,
-    BinaryOperator, ComparisonExpression, ComparisonOperator, Expression, FnExpression,
-    IfExpression, LetExpression, LogicalExpression, LogicalOperator,
+use crate::{
+    ast::{
+        AstDeclaration, AstFnDeclaration, AstLetDeclaration, AstProgram, BinaryExpression,
+        BinaryOperator, ComparisonExpression, ComparisonOperator, Expression, FnExpression,
+        IfExpression, LetExpression, LogicalExpression, LogicalOperator,
+    },
+    semantic::Typ,
 };
 
 pub(crate) fn ast_prog(items: &[AstDeclaration]) -> AstProgram {
@@ -10,11 +13,20 @@ pub(crate) fn ast_prog(items: &[AstDeclaration]) -> AstProgram {
     }
 }
 
-pub(crate) fn ast_fn(name: &str, params: &[&str], body: Expression) -> AstDeclaration {
+pub(crate) fn ast_fn(
+    name: &str,
+    params: &[(&str, Typ)],
+    ret_type: Typ,
+    body: Expression,
+) -> AstDeclaration {
     AstDeclaration::Fn(AstFnDeclaration {
         name: name.to_string(),
-        params: params.into_iter().map(ToString::to_string).collect(),
+        params: params
+            .into_iter()
+            .map(|(n, t)| (n.to_string(), t.clone()))
+            .collect(),
         body,
+        typ: ret_type,
     })
 }
 
