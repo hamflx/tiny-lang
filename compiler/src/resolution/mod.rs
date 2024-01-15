@@ -2,6 +2,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::{
     ast::{self, BinaryOperator, ComparisonOperator, Expression, LogicalOperator},
+    semantic::Typ,
     utils::expression::{app_fn, integer, let_expr, let_fn, op_mul, op_sub, var},
 };
 
@@ -25,7 +26,8 @@ pub(crate) enum AstDeclaration {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct AstFnDeclaration {
     pub(crate) name: Identifier,
-    pub(crate) params: Vec<Identifier>,
+    pub(crate) params: Vec<(Identifier, Typ)>,
+    pub(crate) typ: Typ,
     pub(crate) body: Expr,
 }
 
@@ -255,17 +257,18 @@ pub(crate) fn compile_declaration(
             let params: Vec<_> = fn_decl
                 .params
                 .iter()
-                .map(|(p, _)| make_identifier(p.to_string()))
+                .map(|(p, typ)| (make_identifier(p.to_string()), typ.clone()))
                 .collect();
             let env = [fn_ident.clone()]
                 .into_iter()
-                .chain(params.clone())
+                .chain(params.iter().map(|(ident, _)| ident.clone()))
                 .chain(env)
                 .collect();
             let body = compile_impl(&fn_decl.body, env);
             AstDeclaration::Fn(AstFnDeclaration {
                 name: fn_ident.clone(),
                 params,
+                typ: fn_decl.typ.clone(),
                 body,
             })
         }

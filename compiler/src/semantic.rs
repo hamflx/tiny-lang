@@ -91,26 +91,21 @@ pub(crate) fn check_program(ctx: Context, prog: &resolution::AstProgram) -> Cons
                 resolution::AstDeclaration::Fn(resolution::AstFnDeclaration {
                     name,
                     params,
+                    typ,
                     body,
                 }) => {
-                    let param_types: Vec<_> = params.iter().map(|_| new_var()).collect();
-                    let ctx = params
-                        .iter()
-                        .cloned()
-                        .zip(param_types.iter().cloned())
-                        .chain(ctx.clone())
-                        .collect();
+                    let ctx = params.iter().cloned().chain(ctx.clone()).collect();
                     let (ret_typ, cs) = check_expr(ctx, body);
                     (
                         name,
-                        Typ::Arrow(
-                            ArrowType {
-                                in_typ: param_types,
-                                out_typ: ret_typ,
-                            }
-                            .into(),
+                        t_arrow(
+                            typ.clone(),
+                            &params
+                                .iter()
+                                .map(|(_, typ)| typ.clone())
+                                .collect::<Vec<_>>(),
                         ),
-                        cs,
+                        [(ret_typ, typ.clone())].into_iter().chain(cs).collect(),
                     )
                 }
                 resolution::AstDeclaration::Let(let_decl) => {
@@ -380,7 +375,10 @@ fn sovle_recurse(mut cs: Constraints, subst: Substituation) -> Substituation {
     }
     let constraint = cs.remove(0);
     match constraint {
-        (Typ::Int, Typ::Int) | (Typ::Bool, Typ::Bool) => sovle_recurse(cs, subst),
+        (Typ::Int, Typ::Int)
+        | (Typ::Bool, Typ::Bool)
+        | (Typ::Unit, Typ::Unit)
+        | (Typ::String, Typ::String) => sovle_recurse(cs, subst),
         (Typ::Arrow(a1), Typ::Arrow(a2)) if a1.in_typ.len() == a2.in_typ.len() => sovle_recurse(
             a1.in_typ
                 .into_iter()

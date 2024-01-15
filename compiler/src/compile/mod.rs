@@ -422,7 +422,7 @@ fn extract_prog_fun(prog: resolution::AstProgram) -> Vec<Fun> {
         .map(|decl| match decl {
             resolution::AstDeclaration::Fn(fn_decl) => Fun {
                 ident: fn_decl.name,
-                params: fn_decl.params,
+                params: fn_decl.params.into_iter().map(|(ident, _)| ident).collect(),
                 body: fn_decl.body,
             },
             resolution::AstDeclaration::Let(_) => todo!(),

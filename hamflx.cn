@@ -1,7 +1,7 @@
-fn hello () {
-  1+2
+fn hello (a: usize, b: usize) -> usize {
+  a+b
 }
 
-fn main () {
-  hello()+10086
+fn main () -> usize {
+  hello(1, 3)+10086
 }
