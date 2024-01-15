@@ -70,9 +70,18 @@ pub(crate) fn parse_code(code: &str) -> AstProgram {
 }
 
 pub(crate) fn parse_expr_code(code: &str) -> Expression {
-    let mut tokenizer = Tokenizer::new(code);
+    let wrapper = format!("fn main() -> () {{{code}}}");
+    let mut tokenizer = Tokenizer::new(&wrapper);
     tokenizer.advance();
-    parse_expr(&mut tokenizer)
+    let main = parseP(&mut tokenizer)
+        .items
+        .into_iter()
+        .find_map(|item| match item {
+            AstDeclaration::Fn(f) if f.name == "main" => Some(f),
+            _ => None,
+        })
+        .unwrap();
+    main.body
 }
 
 fn err(expected: &[&str], got: &Token) -> ! {

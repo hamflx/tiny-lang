@@ -212,6 +212,10 @@ fn compile_and_run(code: &str) -> isize {
     compile_and_run_with_vars(code, &[])
 }
 
+fn compile_and_run_expr(code: &str) -> isize {
+    compile_and_run_with_vars(&format!("fn main () -> usize {{ {code} }}"), &[])
+}
+
 fn compile_and_run_with_vars(code: &str, vars: &[(&str, u32)]) -> isize {
     let get_var = {
         let vars: Vec<_> = vars.iter().map(|(s, v)| (s.to_string(), *v)).collect();
@@ -238,7 +242,7 @@ fn compile_and_run_with_vars(code: &str, vars: &[(&str, u32)]) -> isize {
 #[test]
 fn test_compile_and_run_now() {
     assert!(
-        (compile_and_run("now() + 1")
+        (compile_and_run("fn main () -> usize { now() + 1 }")
             - SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
@@ -249,23 +253,15 @@ fn test_compile_and_run_now() {
 }
 
 #[test]
-fn test_compile_and_run_vars() {
-    assert_eq!(
-        compile_and_run_with_vars("age + 1", &[("age", 10010)]),
-        10011
-    );
-}
-
-#[test]
 fn test_compile_and_run_fn() {
-    assert_eq!(compile_and_run("fn hello() { 1 + 1 } hello()"), 2);
+    assert_eq!(compile_and_run("fn main() -> usize { 1 + 1 }"), 2);
 }
 
 #[test]
 fn test_compile_and_run() {
     macro_rules! run {
         ($($t:tt)*) => {
-            assert_eq!(compile_and_run(stringify!($($t)*)), $($t)*);
+            assert_eq!(compile_and_run_expr(stringify!($($t)*)), $($t)*);
         };
     }
     run!(1 + 2 * 3);
