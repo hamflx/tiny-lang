@@ -4,8 +4,8 @@ pub(crate) mod native;
 use crate::{
     ast::{BinaryOperator, ComparisonOperator, LogicalOperator},
     resolution::{
-        self, make_identifier, BinaryExpression, ComparisonExpression, Expr, Identifier,
-        IfExpression, LetExpression, LogicalExpression,
+        self, make_identifier, AstStatement, BinaryExpression, ComparisonExpression, Expr,
+        Identifier, IfExpression, LetExpression, LogicalExpression,
     },
     utils::expression::{app_fn, integer, let_expr, let_fn, op_add, op_mul, op_sub, var},
 };
@@ -14,7 +14,7 @@ use crate::{
 struct Fun {
     ident: Identifier,
     params: Vec<Identifier>,
-    body: Expr,
+    body: Vec<resolution::AstStatement>,
 }
 
 fn extract_fun(expr: Expr) -> (Expr, Vec<Fun>) {
@@ -35,7 +35,7 @@ fn extract_fun(expr: Expr) -> (Expr, Vec<Fun>) {
                     vec![Fun {
                         ident: l.name,
                         params: f.params,
-                        body: fn_body,
+                        body: vec![AstStatement::Expr(fn_body)],
                     }]
                     .into_iter()
                     .chain(value_fns.into_iter())
@@ -248,6 +248,34 @@ impl Instruction {
     }
 }
 
+fn compile_fn_stmt_list(stmt_list: Vec<AstStatement>, stack: Vec<StackValue>) -> Vec<Instruction> {
+    let len = stmt_list.len();
+    let (head, _) =
+        stmt_list
+            .into_iter()
+            .fold((Vec::new(), stack), |(mut head, mut stack), stmt| {
+                match stmt {
+                    AstStatement::Let(let_decl) => {
+                        let let_instr = compile_expr(let_decl.value, stack.clone());
+                        stack.insert(0, StackValue::Slocal(let_decl.name));
+                        head.extend(let_instr);
+                    }
+                    AstStatement::Expr(expr) => {
+                        let instr_list = compile_expr(expr, stack.clone());
+                        stack.insert(0, StackValue::Stmp);
+                        head.extend(instr_list);
+                    }
+                }
+                (head, stack)
+            });
+    let pops = (0..len - 1).fold(Vec::new(), |mut pops, _| {
+        pops.push(Instruction::Swap);
+        pops.push(Instruction::Pop);
+        pops
+    });
+    head.into_iter().chain(pops).collect()
+}
+
 fn compile_expr(expr: Expr, stack: Vec<StackValue>) -> Vec<Instruction> {
     match expr {
         Expr::Var(id) => {
@@ -377,7 +405,7 @@ fn compile_expr(expr: Expr, stack: Vec<StackValue>) -> Vec<Instruction> {
 fn compile_fun(fun: Fun) -> Vec<Instruction> {
     let params_len = fun.params.len();
     let stack = fun.params.into_iter().map(|p| StackValue::Slocal(p)).rev();
-    let instrs = compile_expr(
+    let instrs = compile_fn_stmt_list(
         fun.body,
         vec![StackValue::Stmp].into_iter().chain(stack).collect(),
     );
@@ -401,7 +429,7 @@ pub(crate) fn compile(expr: Expr) -> Vec<Instruction> {
     let main_ident = make_identifier("main".to_string());
     let main_fun = Fun {
         ident: main_ident.clone(),
-        body: main_expr,
+        body: vec![AstStatement::Expr(main_expr)],
         params: Vec::new(),
     };
     let fun_instrs = [main_fun]
@@ -440,7 +468,7 @@ pub(crate) fn compile_program(prog: resolution::AstProgram) -> Vec<Instruction> 
     let start_ident = make_identifier("start".to_string());
     let start_fun = Fun {
         ident: start_ident.clone(),
-        body: Expr::App(main.ident.clone(), vec![]),
+        body: vec![AstStatement::Expr(Expr::App(main.ident.clone(), vec![]))],
         params: Vec::new(),
     };
     let fun_instrs = [start_fun]

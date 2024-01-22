@@ -28,7 +28,7 @@ pub(crate) struct AstFnDeclaration {
     pub(crate) name: Identifier,
     pub(crate) params: Vec<(Identifier, Typ)>,
     pub(crate) typ: Typ,
-    pub(crate) body: Expr,
+    pub(crate) body: Vec<AstStatement>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -39,7 +39,7 @@ pub(crate) struct AstLetDeclaration {
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum AstStatement {
-    Decl(AstDeclaration),
+    Let(AstLetDeclaration),
     Expr(Expr),
 }
 
@@ -247,6 +247,31 @@ pub(crate) fn compile_program(prog: &ast::AstProgram, env: Vec<Identifier>) -> A
     AstProgram { items }
 }
 
+pub(crate) fn compile_statement_list(
+    stmts: &[ast::AstStatement],
+    env: Vec<Identifier>,
+) -> Vec<AstStatement> {
+    let (_, list) = stmts
+        .iter()
+        .fold((env, Vec::new()), |(mut env, mut list), stmt| {
+            match stmt {
+                ast::AstStatement::Let(let_decl) => {
+                    let ident = make_identifier(let_decl.name.to_string());
+                    list.push(AstStatement::Let(AstLetDeclaration {
+                        name: ident.clone(),
+                        value: compile_impl(&let_decl.value, env.clone()),
+                    }));
+                    env.push(ident);
+                }
+                ast::AstStatement::Expr(expr) => {
+                    list.push(AstStatement::Expr(compile_impl(&expr, env.clone())));
+                }
+            }
+            (env, list)
+        });
+    list
+}
+
 pub(crate) fn compile_declaration(
     decl: &ast::AstDeclaration,
     env: Vec<Identifier>,
@@ -259,22 +284,17 @@ pub(crate) fn compile_declaration(
                 .iter()
                 .map(|(p, typ)| (make_identifier(p.to_string()), typ.clone()))
                 .collect();
-            let env = [fn_ident.clone()]
+            let env: Vec<_> = [fn_ident.clone()]
                 .into_iter()
                 .chain(params.iter().map(|(ident, _)| ident.clone()))
                 .chain(env)
                 .collect();
-            // todo 支持多个语句。
-            let fn_body = match fn_decl.body.iter().next() {
-                Some(ast::AstStatement::Expr(expr)) => expr,
-                _ => todo!(),
-            };
-            let body = compile_impl(fn_body, env);
+            let stmts = compile_statement_list(&fn_decl.body, env.clone());
             AstDeclaration::Fn(AstFnDeclaration {
                 name: fn_ident.clone(),
                 params,
                 typ: fn_decl.typ.clone(),
-                body,
+                body: stmts,
             })
         }
         ast::AstDeclaration::Let(let_decl) => {

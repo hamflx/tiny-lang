@@ -3,5 +3,6 @@ fn hello (a: usize, b: usize) -> usize {
 }
 
 fn main () -> usize {
-  hello(1, 3)+10086
+  let yidong = 10081;
+  hello(3, 2)+yidong
 }

@@ -82,6 +82,30 @@ pub(crate) fn apply_subst(typ: &Typ, subst: &Substituation) -> Typ {
         .clone()
 }
 
+pub(crate) fn check_stmt_list(
+    ctx: Context,
+    stmt_list: &[resolution::AstStatement],
+) -> (Typ, Constraints) {
+    let (_, typ, cs) = stmt_list.iter().fold(
+        (ctx, Typ::Unit, vec![]),
+        |(mut ctx, _, constraints), decl| {
+            let (typ, cs) = match decl {
+                resolution::AstStatement::Let(let_decl) => {
+                    let (typ, cs) = check_expr(ctx.clone(), &let_decl.value);
+                    ctx.insert(0, (let_decl.name.clone(), typ));
+                    (Typ::Unit, cs)
+                }
+                resolution::AstStatement::Expr(expr) => {
+                    let (typ, cs) = check_expr(ctx.clone(), expr);
+                    (typ, cs)
+                }
+            };
+            (ctx, typ, cs.into_iter().chain(constraints).collect())
+        },
+    );
+    (typ, cs)
+}
+
 pub(crate) fn check_program(ctx: Context, prog: &resolution::AstProgram) -> Constraints {
     let (_, cs) = prog
         .items
@@ -95,7 +119,7 @@ pub(crate) fn check_program(ctx: Context, prog: &resolution::AstProgram) -> Cons
                     body,
                 }) => {
                     let ctx = params.iter().cloned().chain(ctx.clone()).collect();
-                    let (ret_typ, cs) = check_expr(ctx, body);
+                    let (ret_typ, cs) = check_stmt_list(ctx, &body);
                     (
                         name,
                         t_arrow(
