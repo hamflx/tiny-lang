@@ -47,7 +47,7 @@ pub(crate) struct AstFnDeclaration {
     pub(crate) name: String,
     pub(crate) params: Vec<(String, Typ)>,
     pub(crate) typ: Typ,
-    pub(crate) body: Expression,
+    pub(crate) body: Vec<Expression>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -81,7 +81,7 @@ pub(crate) fn parse_expr_code(code: &str) -> Expression {
             _ => None,
         })
         .unwrap();
-    main.body
+    main.body.into_iter().next().unwrap()
 }
 
 fn err(expected: &[&str], got: &Token) -> ! {
@@ -227,7 +227,7 @@ fn parseFn(tokenizer: &mut Tokenizer) -> AstDeclaration {
                 name: id,
                 params: e3,
                 typ: e6,
-                body: e8,
+                body: vec![e8],
             })
         }
         tok => err(&["fn"], &tok),

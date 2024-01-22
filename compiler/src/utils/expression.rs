@@ -25,7 +25,7 @@ pub(crate) fn ast_fn(
             .into_iter()
             .map(|(n, t)| (n.to_string(), t.clone()))
             .collect(),
-        body,
+        body: vec![body],
         typ: ret_type,
     })
 }

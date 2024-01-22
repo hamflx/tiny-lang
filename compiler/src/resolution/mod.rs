@@ -264,7 +264,8 @@ pub(crate) fn compile_declaration(
                 .chain(params.iter().map(|(ident, _)| ident.clone()))
                 .chain(env)
                 .collect();
-            let body = compile_impl(&fn_decl.body, env);
+            // todo 支持多个语句。
+            let body = compile_impl(fn_decl.body.iter().next().unwrap(), env);
             AstDeclaration::Fn(AstFnDeclaration {
                 name: fn_ident.clone(),
                 params,
