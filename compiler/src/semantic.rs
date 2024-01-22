@@ -150,6 +150,7 @@ pub(crate) fn check_expr(ctx: Context, expr: &resolution::Expr) -> (Typ, Constra
             Vec::new(),
         ),
         resolution::Expr::CstI(_) => (Typ::Int, Vec::new()),
+        resolution::Expr::StrLiteral(_) => (Typ::String, Vec::new()),
         resolution::Expr::CstF(_) => todo!(),
         resolution::Expr::CstB(_) => todo!(),
         resolution::Expr::Instant(_) => (Typ::Instant, Vec::new()),

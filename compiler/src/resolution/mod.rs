@@ -49,6 +49,7 @@ pub(crate) enum Expr {
     CstI(isize),
     CstF(f64),
     CstB(bool),
+    StrLiteral(String),
     Instant(usize),
     TimeSpan(usize),
     Fn(Box<FnExpression>),
@@ -151,6 +152,7 @@ fn compile_impl(expr: &Expression, env: Vec<Identifier>) -> Expr {
         Expression::CstI(i) => Expr::CstI(*i),
         Expression::CstF(f) => Expr::CstF(*f),
         Expression::CstB(b) => Expr::CstB(*b),
+        Expression::StrLiteral(str_lit) => Expr::StrLiteral(str_lit.clone()),
         Expression::Instant(i) => Expr::Instant(*i),
         Expression::TimeSpan(s) => Expr::TimeSpan(*s),
         Expression::Let(expr) => {

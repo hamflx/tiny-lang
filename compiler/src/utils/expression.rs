@@ -58,6 +58,10 @@ pub(crate) fn id(name: String) -> Expression {
     Expression::Var(name)
 }
 
+pub(crate) fn lit_string(text: &str) -> Expression {
+    Expression::StrLiteral(text.to_string())
+}
+
 pub(crate) fn integer(num: isize) -> Expression {
     Expression::CstI(num)
 }

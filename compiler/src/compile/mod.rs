@@ -23,6 +23,7 @@ fn extract_fun(expr: Expr) -> (Expr, Vec<Fun>) {
         Expr::CstI(i) => (Expr::CstI(i), Vec::new()),
         Expr::CstF(f) => (Expr::CstF(f), Vec::new()),
         Expr::CstB(b) => (Expr::CstB(b), Vec::new()),
+        Expr::StrLiteral(str_lit) => (Expr::StrLiteral(str_lit), Vec::new()),
         Expr::Instant(i) => (Expr::Instant(i), Vec::new()),
         Expr::TimeSpan(t) => (Expr::TimeSpan(t), Vec::new()),
         Expr::Fn(_) => unimplemented!(),
@@ -291,6 +292,7 @@ fn compile_expr(expr: Expr, stack: Vec<StackValue>) -> Vec<Instruction> {
         Expr::CstI(i) => vec![Instruction::Const(i)],
         Expr::CstF(_) => todo!(),
         Expr::CstB(_) => todo!(),
+        Expr::StrLiteral(_) => todo!(),
         Expr::Instant(_) => todo!(),
         Expr::TimeSpan(_) => todo!(),
         Expr::Let(expr) => {

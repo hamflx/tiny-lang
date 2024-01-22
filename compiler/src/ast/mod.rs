@@ -19,6 +19,7 @@ pub(crate) enum Expression {
     CstI(isize),
     CstF(f64),
     CstB(bool),
+    StrLiteral(String),
     Instant(usize),
     TimeSpan(usize),
     Fn(Box<FnExpression>),

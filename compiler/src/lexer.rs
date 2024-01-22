@@ -4,6 +4,7 @@ use std::{iter::Peekable, str::Chars};
 pub(crate) enum Token {
     Id(String),
     Num(String),
+    StrLiteral(String),
     TimeLiteral(String, TimeUnit),
     Arrow,
     Comma,
@@ -58,6 +59,23 @@ impl TryFrom<char> for TimeUnit {
     }
 }
 
+fn scan_string(code: &mut Peekable<Chars<'_>>) -> String {
+    let mut text = String::new();
+    while let Some(ch) = code.next() {
+        match ch {
+            '\\' => match code.next() {
+                Some('\\') => text.push('\\'),
+                Some('"') => text.push('"'),
+                Some(ch) => panic!("invalid token: {}", ch),
+                None => break,
+            },
+            '"' => break,
+            ch => text.push(ch),
+        }
+    }
+    text
+}
+
 pub(crate) struct Tokenizer<'c> {
     code: Peekable<Chars<'c>>,
     token: Token,
@@ -78,6 +96,7 @@ impl<'c> Tokenizer<'c> {
     pub(crate) fn advance(&mut self) {
         while let Some(ch) = self.code.next() {
             match ch {
+                '"' => self.token = Token::StrLiteral(scan_string(&mut self.code)),
                 '|' => match self.code.next_if(|ch| *ch == '|') {
                     Some(_) => self.token = Token::Or,
                     None => panic!("invalid token: {ch}"),
@@ -200,5 +219,9 @@ fn test_tokenizer() {
             Token::Plus,
             Token::TimeLiteral("2".to_string(), TimeUnit::Day),
         ]
+    );
+    assert_eq!(
+        to_token_list("\"hello\""),
+        vec![Token::StrLiteral("hello".to_string())]
     );
 }
