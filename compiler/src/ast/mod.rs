@@ -43,11 +43,17 @@ pub(crate) enum AstDeclaration {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub(crate) enum AstStatement {
+    Let(AstLetDeclaration),
+    Expr(Expression),
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct AstFnDeclaration {
     pub(crate) name: String,
     pub(crate) params: Vec<(String, Typ)>,
     pub(crate) typ: Typ,
-    pub(crate) body: Vec<Expression>,
+    pub(crate) body: Vec<AstStatement>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

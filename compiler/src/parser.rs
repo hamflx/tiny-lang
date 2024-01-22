@@ -1,10 +1,13 @@
 use crate::{
-    ast::{AstDeclaration, AstFnDeclaration, AstLetDeclaration, AstProgram, Expression},
+    ast::{
+        AstDeclaration, AstFnDeclaration, AstLetDeclaration, AstProgram, AstStatement, Expression,
+    },
     lexer::{Token, Tokenizer},
     semantic::{RecordType, Typ},
     utils::expression::{
-        ast_fn, ast_prog, call_expr, fn_expr, if_expr, integer, let_expr, op_add, op_and, op_div,
-        op_ge, op_gt, op_le, op_lt, op_mul, op_not, op_or, op_sub,
+        ast_fn, ast_fn_stmt, ast_prog, call_expr, fn_expr, if_expr, integer, let_expr, op_add,
+        op_and, op_div, op_ge, op_gt, op_le, op_lt, op_mul, op_not, op_or, op_sub, stmt_expr,
+        stmt_let, var,
     },
 };
 
@@ -61,6 +64,15 @@ fn test_parser_fn_main() {
             ),
         ])
     );
+    assert_eq!(
+        parse_code("fn main () -> () { let hello = 1; hello }"),
+        ast_prog(&[ast_fn_stmt(
+            "main",
+            &[],
+            Typ::Unit,
+            &[stmt_let("hello", integer(1)), stmt_expr(var("hello"))]
+        )])
+    );
 }
 
 pub(crate) fn parse_code(code: &str) -> AstProgram {
@@ -81,7 +93,10 @@ pub(crate) fn parse_expr_code(code: &str) -> Expression {
             _ => None,
         })
         .unwrap();
-    main.body.into_iter().next().unwrap()
+    match main.body.into_iter().next() {
+        Some(AstStatement::Expr(expr)) => expr,
+        _ => todo!(),
+    }
 }
 
 fn err(expected: &[&str], got: &Token) -> ! {
@@ -92,6 +107,34 @@ pub(crate) fn parse_expr(tokenizer: &mut Tokenizer) -> Expression {
     let expr = parseE(tokenizer);
     tokenizer.eat(Token::Eof);
     expr
+}
+
+fn parse_block_statement(tokenizer: &mut Tokenizer) -> Option<AstStatement> {
+    match tokenizer.token() {
+        Token::RBrace => None,
+        Token::Semi => {
+            tokenizer.advance();
+            parse_block_statement(tokenizer)
+        }
+        Token::Let => Some(AstStatement::Let(parseLet(tokenizer))),
+        Token::Id(_) | Token::If | Token::LParen | Token::Minus | Token::Not | Token::Num(_) => {
+            let stmt = Some(AstStatement::Expr(parseE(tokenizer)));
+            match tokenizer.token() {
+                Token::Semi | Token::RBrace => {}
+                tok => err(&[";", "}"], &tok),
+            }
+            stmt
+        }
+        tok => err(&["(", "id", "!", "-", "if", "num", ";", "}"], &tok),
+    }
+}
+
+fn parse_block_statement_list(tokenizer: &mut Tokenizer) -> Vec<AstStatement> {
+    let mut stmts = Vec::new();
+    while let Some(stmt) = parse_block_statement(tokenizer) {
+        stmts.push(stmt);
+    }
+    stmts
 }
 
 pub(crate) fn parseP(tokenizer: &mut Tokenizer) -> AstProgram {
@@ -182,11 +225,11 @@ fn parseItems(tokenizer: &mut Tokenizer, prefix: Vec<AstDeclaration>) -> Vec<Ast
 fn parseItem(tokenizer: &mut Tokenizer) -> AstDeclaration {
     match tokenizer.token() {
         Token::Fn => parseFn(tokenizer),
-        Token::Let => parseLet(tokenizer),
+        Token::Let => AstDeclaration::Let(parseLet(tokenizer)),
         tok => err(&["fn", "let"], &tok),
     }
 }
-fn parseLet(tokenizer: &mut Tokenizer) -> AstDeclaration {
+fn parseLet(tokenizer: &mut Tokenizer) -> AstLetDeclaration {
     match tokenizer.token() {
         Token::Let => {
             tokenizer.eat(Token::Let);
@@ -198,10 +241,10 @@ fn parseLet(tokenizer: &mut Tokenizer) -> AstDeclaration {
             tokenizer.eat(Token::Assign);
             let e3 = parseE(tokenizer);
             tokenizer.eat(Token::Semi);
-            AstDeclaration::Let(AstLetDeclaration {
+            AstLetDeclaration {
                 name: id,
                 value: e3,
-            })
+            }
         }
         tok => err(&["let"], &tok),
     }
@@ -221,13 +264,13 @@ fn parseFn(tokenizer: &mut Tokenizer) -> AstDeclaration {
             tokenizer.eat(Token::Arrow);
             let e6 = parseType(tokenizer);
             tokenizer.eat(Token::LBrace);
-            let e8 = parseE(tokenizer);
+            let body = parse_block_statement_list(tokenizer);
             tokenizer.eat(Token::RBrace);
             AstDeclaration::Fn(AstFnDeclaration {
                 name: id,
                 params: e3,
                 typ: e6,
-                body: vec![e8],
+                body,
             })
         }
         tok => err(&["fn"], &tok),

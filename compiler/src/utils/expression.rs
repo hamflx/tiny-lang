@@ -1,8 +1,8 @@
 use crate::{
     ast::{
-        AstDeclaration, AstFnDeclaration, AstLetDeclaration, AstProgram, BinaryExpression,
-        BinaryOperator, ComparisonExpression, ComparisonOperator, Expression, FnExpression,
-        IfExpression, LetExpression, LogicalExpression, LogicalOperator,
+        AstDeclaration, AstFnDeclaration, AstLetDeclaration, AstProgram, AstStatement,
+        BinaryExpression, BinaryOperator, ComparisonExpression, ComparisonOperator, Expression,
+        FnExpression, IfExpression, LetExpression, LogicalExpression, LogicalOperator,
     },
     semantic::Typ,
 };
@@ -25,7 +25,24 @@ pub(crate) fn ast_fn(
             .into_iter()
             .map(|(n, t)| (n.to_string(), t.clone()))
             .collect(),
-        body: vec![body],
+        body: vec![AstStatement::Expr(body)],
+        typ: ret_type,
+    })
+}
+
+pub(crate) fn ast_fn_stmt(
+    name: &str,
+    params: &[(&str, Typ)],
+    ret_type: Typ,
+    body: &[AstStatement],
+) -> AstDeclaration {
+    AstDeclaration::Fn(AstFnDeclaration {
+        name: name.to_string(),
+        params: params
+            .into_iter()
+            .map(|(n, t)| (n.to_string(), t.clone()))
+            .collect(),
+        body: body.iter().cloned().collect(),
         typ: ret_type,
     })
 }
@@ -66,6 +83,17 @@ pub(crate) fn let_expr(name: &str, value: Expression, scope: Expression) -> Expr
         }
         .into(),
     )
+}
+
+pub(crate) fn stmt_let(name: &str, value: Expression) -> AstStatement {
+    AstStatement::Let(AstLetDeclaration {
+        name: name.to_string(),
+        value,
+    })
+}
+
+pub(crate) fn stmt_expr(value: Expression) -> AstStatement {
+    AstStatement::Expr(value)
 }
 
 pub(crate) fn fn_expr(params: &[String], body: Expression) -> Expression {

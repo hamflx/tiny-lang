@@ -265,7 +265,11 @@ pub(crate) fn compile_declaration(
                 .chain(env)
                 .collect();
             // todo 支持多个语句。
-            let body = compile_impl(fn_decl.body.iter().next().unwrap(), env);
+            let fn_body = match fn_decl.body.iter().next() {
+                Some(ast::AstStatement::Expr(expr)) => expr,
+                _ => todo!(),
+            };
+            let body = compile_impl(fn_body, env);
             AstDeclaration::Fn(AstFnDeclaration {
                 name: fn_ident.clone(),
                 params,
