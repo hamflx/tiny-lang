@@ -4,5 +4,6 @@ fn hello (a: usize, b: usize) -> usize {
 
 fn main () -> usize {
   let yidong = 10081;
+  print("hello world");
   hello(3, 2)+yidong
 }
