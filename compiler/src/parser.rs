@@ -129,7 +129,13 @@ fn parse_block_statement(tokenizer: &mut Tokenizer) -> Option<AstStatement> {
             parse_block_statement(tokenizer)
         }
         Token::Let => Some(AstStatement::Let(parseLet(tokenizer))),
-        Token::Id(_) | Token::If | Token::LParen | Token::Minus | Token::Not | Token::Num(_) => {
+        Token::Id(_)
+        | Token::If
+        | Token::LParen
+        | Token::Minus
+        | Token::Not
+        | Token::Num(_)
+        | Token::StrLiteral(_) => {
             let stmt = Some(AstStatement::Expr(parseE(tokenizer)));
             match tokenizer.token() {
                 Token::Semi | Token::RBrace => {}

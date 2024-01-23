@@ -21,7 +21,7 @@ use semantic::{check_expr, solve};
 use vm::{CallContext, SysCall, Vm};
 
 use crate::{
-    compile::native::run_code_native,
+    compile::native::{run_code_native, run_code_native_string},
     semantic::{apply_subst, check_program, t_arrow, Typ},
 };
 
@@ -206,6 +206,7 @@ fn test_compile_and_run_print_str() {
         compile_and_run("fn main() -> usize { print(\"hello\"); 0 }"),
         0
     );
+    assert_eq!(run_code_native_string("\"hello\""), "hello");
 }
 
 #[test]
