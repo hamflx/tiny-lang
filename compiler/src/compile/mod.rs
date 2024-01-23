@@ -165,7 +165,7 @@ fn test_split_fun() {
         ),
         app_fn("calc", &[integer(2)]),
     );
-    let expr = resolution::compile(&expr);
+    let (expr, _) = resolution::compile(&expr);
     let (expr, funs) = extract_fun(expr);
     println!("expr: {:#?}", expr);
     println!("funs: {:#?}", funs);
@@ -185,7 +185,7 @@ fn test_split_embed_fun() {
         ),
         app_fn("add", &[integer(1), integer(2)]),
     );
-    let expr = resolution::compile(&expr);
+    let (expr, _) = resolution::compile(&expr);
     let (expr, funs) = extract_fun(expr);
     println!("expr: {:#?}", expr);
     println!("funs: {:#?}", funs);
@@ -214,6 +214,8 @@ pub(crate) enum Instruction {
     Var(usize),
     Pop,
     Swap,
+    Ldstr(Identifier),
+    Bytes(Vec<u8>),
     Call(Identifier, usize),
     SysCall(usize, usize),
     Ret(usize),
@@ -230,7 +232,8 @@ impl Instruction {
             | Instruction::Var(_)
             | Instruction::Ret(_)
             | Instruction::IfZero(_)
-            | Instruction::Goto(_) => 2,
+            | Instruction::Goto(_)
+            | Instruction::Ldstr(_) => 2,
             Instruction::Le
             | Instruction::Lt
             | Instruction::Ge
@@ -245,6 +248,7 @@ impl Instruction {
             | Instruction::Swap
             | Instruction::Exit => 1,
             Instruction::Call(_, _) | Instruction::SysCall(_, _) => 3,
+            Instruction::Bytes(b) => (b.len() + 1 + 3) / 4,
         }
     }
 }
@@ -292,7 +296,7 @@ fn compile_expr(expr: Expr, stack: Vec<StackValue>) -> Vec<Instruction> {
         Expr::CstI(i) => vec![Instruction::Const(i)],
         Expr::CstF(_) => todo!(),
         Expr::CstB(_) => todo!(),
-        Expr::StrLiteral(_) => todo!(),
+        Expr::StrLiteral(i) => vec![Instruction::Ldstr(i)],
         Expr::Instant(_) => todo!(),
         Expr::TimeSpan(_) => todo!(),
         Expr::Let(expr) => {
@@ -446,8 +450,8 @@ pub(crate) fn compile(expr: Expr) -> Vec<Instruction> {
         .collect()
 }
 
-fn extract_prog_fun(prog: resolution::AstProgram) -> Vec<Fun> {
-    prog.items
+fn extract_prog_fun(items: Vec<resolution::AstDeclaration>) -> Vec<Fun> {
+    items
         .into_iter()
         .map(|decl| match decl {
             resolution::AstDeclaration::Fn(fn_decl) => Fun {
@@ -461,7 +465,18 @@ fn extract_prog_fun(prog: resolution::AstProgram) -> Vec<Fun> {
 }
 
 pub(crate) fn compile_program(prog: resolution::AstProgram) -> Vec<Instruction> {
-    let fun_list = extract_prog_fun(prog);
+    let constants: Vec<_> = prog
+        .constants
+        .into_iter()
+        .map(|(ident, cst)| {
+            [
+                Instruction::Label(ident),
+                Instruction::Bytes(cst.into_bytes()),
+            ]
+        })
+        .flatten()
+        .collect();
+    let fun_list = extract_prog_fun(prog.items);
     let main = fun_list
         .iter()
         .find(|f| f.ident.name == "main")
@@ -482,6 +497,7 @@ pub(crate) fn compile_program(prog: resolution::AstProgram) -> Vec<Instruction> 
     [Instruction::Call(start_ident, 0), Instruction::Exit]
         .into_iter()
         .chain(fun_instrs)
+        .chain(constants)
         .collect()
 }
 
@@ -499,7 +515,7 @@ fn test_compile() {
         ),
         app_fn("add", &[integer(1), integer(2)]),
     );
-    let expr = resolution::compile(&expr);
+    let (expr, _) = resolution::compile(&expr);
     let instrs = compile(expr);
     println!("instrs: {:#?}", instrs);
 }

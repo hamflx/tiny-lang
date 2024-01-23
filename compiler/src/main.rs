@@ -1,5 +1,6 @@
 mod ast;
 mod compile;
+mod formula;
 mod lexer;
 mod parser;
 mod resolution;
@@ -7,7 +8,10 @@ mod semantic;
 mod utils;
 mod vm;
 
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    ffi::CStr,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use clap::Parser;
 use compile::build_syscall_stub;
@@ -42,79 +46,6 @@ struct SysCallTableRecord {
     id: Identifier,
     typ: Typ,
     ctx: Option<Box<dyn CallContext>>,
-}
-
-fn replace_var_with_call(
-    expr: resolution::Expr,
-    get_ident: Identifier,
-    table: &SysVariableTable,
-) -> resolution::Expr {
-    match expr {
-        resolution::Expr::Var(ident) => {
-            let record = table.rows.iter().find(|r| r.id == ident).unwrap();
-            let no = resolution::Expr::CstI(record.no as _);
-            let typ = resolution::Expr::CstI(record.typ as _);
-            let args = vec![no, typ];
-            resolution::Expr::App(get_ident.clone(), args)
-        }
-        resolution::Expr::Fn(expr) => resolution::Expr::Fn(
-            resolution::FnExpression {
-                params: expr.params,
-                body: replace_var_with_call(expr.body, get_ident, table),
-            }
-            .into(),
-        ),
-        resolution::Expr::Let(expr) => resolution::Expr::Let(
-            resolution::LetExpression {
-                name: expr.name,
-                value: replace_var_with_call(expr.value, get_ident.clone(), table),
-                scope: replace_var_with_call(expr.scope, get_ident.clone(), table),
-            }
-            .into(),
-        ),
-        resolution::Expr::App(ident, args) => resolution::Expr::App(
-            ident,
-            args.into_iter()
-                .map(|p| replace_var_with_call(p, get_ident.clone(), table))
-                .collect(),
-        ),
-        resolution::Expr::If(expr) => resolution::Expr::If(
-            resolution::IfExpression {
-                condition: replace_var_with_call(expr.condition, get_ident.clone(), table),
-                then: replace_var_with_call(expr.then, get_ident.clone(), table),
-                other: replace_var_with_call(expr.other, get_ident.clone(), table),
-            }
-            .into(),
-        ),
-        resolution::Expr::BinaryOperation(expr) => resolution::Expr::BinaryOperation(
-            resolution::BinaryExpression {
-                op: expr.op,
-                left: replace_var_with_call(expr.left, get_ident.clone(), table),
-                right: replace_var_with_call(expr.right, get_ident.clone(), table),
-            }
-            .into(),
-        ),
-        resolution::Expr::Comparison(expr) => resolution::Expr::Comparison(
-            resolution::ComparisonExpression {
-                op: expr.op,
-                left: replace_var_with_call(expr.left, get_ident.clone(), table),
-                right: replace_var_with_call(expr.right, get_ident.clone(), table),
-            }
-            .into(),
-        ),
-        resolution::Expr::Logical(expr) => resolution::Expr::Logical(
-            resolution::LogicalExpression {
-                op: expr.op,
-                left: replace_var_with_call(expr.left, get_ident.clone(), table),
-                right: replace_var_with_call(expr.right, get_ident.clone(), table),
-            }
-            .into(),
-        ),
-        resolution::Expr::Not(expr) => {
-            resolution::Expr::Not(replace_var_with_call(*expr, get_ident.clone(), table).into())
-        }
-        expr => expr,
-    }
 }
 
 fn compile_to_byte_code(
@@ -188,6 +119,12 @@ fn build_default_sys_calls(get_var: impl Fn(u32, u32) -> u32 + 'static) -> SysCa
         return (ctx.get)(no, typ);
     }
 
+    fn print(_: &SysCall, fmt: u64) -> u32 {
+        let ptr = unsafe { CStr::from_ptr(fmt as _) }.to_str().unwrap();
+        println!("==> print: {}", ptr);
+        0
+    }
+
     SysCallTable {
         rows: vec![
             SysCallTableRecord {
@@ -202,6 +139,12 @@ fn build_default_sys_calls(get_var: impl Fn(u32, u32) -> u32 + 'static) -> SysCa
                 ptr: now as *const (),
                 id: make_identifier("now".to_string()),
                 typ: t_arrow(Typ::Int, &[]),
+                ctx: None,
+            },
+            SysCallTableRecord {
+                ptr: print as *const (),
+                id: make_identifier("print".to_string()),
+                typ: t_arrow(Typ::Int, &[Typ::String]),
                 ctx: None,
             },
         ],
@@ -255,6 +198,14 @@ fn test_compile_and_run_now() {
 #[test]
 fn test_compile_and_run_fn() {
     assert_eq!(compile_and_run("fn main() -> usize { 1 + 1 }"), 2);
+}
+
+#[test]
+fn test_compile_and_run_print_str() {
+    assert_eq!(
+        compile_and_run("fn main() -> usize { print(\"hello\"); 0 }"),
+        0
+    );
 }
 
 #[test]

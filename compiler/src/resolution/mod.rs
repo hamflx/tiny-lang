@@ -15,6 +15,7 @@ pub(crate) struct Identifier {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct AstProgram {
     pub(crate) items: Vec<AstDeclaration>,
+    pub(crate) constants: Vec<(Identifier, String)>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -49,7 +50,7 @@ pub(crate) enum Expr {
     CstI(isize),
     CstF(f64),
     CstB(bool),
-    StrLiteral(String),
+    StrLiteral(Identifier),
     Instant(usize),
     TimeSpan(usize),
     Fn(Box<FnExpression>),
@@ -140,39 +141,54 @@ pub(crate) fn make_identifier(name: String) -> Identifier {
     Identifier { name, stamp }
 }
 
-fn compile_impl(expr: &Expression, env: Vec<Identifier>) -> Expr {
+fn compile_impl(expr: &Expression, env: Vec<Identifier>) -> (Expr, Vec<(Identifier, String)>) {
     match expr {
-        Expression::Var(var_name) => Expr::Var(
-            env.iter()
-                .find(|i| i.name == *var_name)
-                .ok_or_else(|| format!("No variable named {var_name}"))
-                .unwrap()
-                .clone(),
+        Expression::Var(var_name) => (
+            Expr::Var(
+                env.iter()
+                    .find(|i| i.name == *var_name)
+                    .ok_or_else(|| format!("No variable named {var_name}"))
+                    .unwrap()
+                    .clone(),
+            ),
+            Vec::new(),
         ),
-        Expression::CstI(i) => Expr::CstI(*i),
-        Expression::CstF(f) => Expr::CstF(*f),
-        Expression::CstB(b) => Expr::CstB(*b),
-        Expression::StrLiteral(str_lit) => Expr::StrLiteral(str_lit.clone()),
-        Expression::Instant(i) => Expr::Instant(*i),
-        Expression::TimeSpan(s) => Expr::TimeSpan(*s),
+        Expression::CstI(i) => (Expr::CstI(*i), Vec::new()),
+        Expression::CstF(f) => (Expr::CstF(*f), Vec::new()),
+        Expression::CstB(b) => (Expr::CstB(*b), Vec::new()),
+        Expression::StrLiteral(str_lit) => {
+            let str_lit_id = make_identifier(str_lit.clone());
+            (
+                Expr::StrLiteral(str_lit_id.clone()),
+                vec![(str_lit_id.clone(), str_lit.clone())],
+            )
+        }
+        Expression::Instant(i) => (Expr::Instant(*i), Vec::new()),
+        Expression::TimeSpan(s) => (Expr::TimeSpan(*s), Vec::new()),
         Expression::Let(expr) => {
             let id = make_identifier(expr.name.clone());
-            let value = compile_impl(&expr.value, env.clone());
+            let (value, val_cs) = compile_impl(&expr.value, env.clone());
             let env = vec![id.clone()].into_iter().chain(env).collect::<Vec<_>>();
-            let scope = compile_impl(&expr.scope, env);
-            Expr::Let(
-                LetExpression {
-                    name: id,
-                    value,
-                    scope,
-                }
-                .into(),
+            let (scope, scope_cs) = compile_impl(&expr.scope, env);
+            (
+                Expr::Let(
+                    LetExpression {
+                        name: id,
+                        value,
+                        scope,
+                    }
+                    .into(),
+                ),
+                val_cs.into_iter().chain(scope_cs).collect(),
             )
         }
         Expression::BinaryOperation(expr) => {
-            let left = compile_impl(&expr.left, env.clone());
-            let right = compile_impl(&expr.right, env.clone());
-            Expr::BinaryOperation(BinaryExpression::new(expr.op.clone(), left, right).into())
+            let (left, left_cs) = compile_impl(&expr.left, env.clone());
+            let (right, right_cs) = compile_impl(&expr.right, env.clone());
+            (
+                Expr::BinaryOperation(BinaryExpression::new(expr.op.clone(), left, right).into()),
+                left_cs.into_iter().chain(right_cs).collect(),
+            )
         }
         Expression::Fn(expr) => {
             let params: Vec<_> = expr
@@ -181,8 +197,8 @@ fn compile_impl(expr: &Expression, env: Vec<Identifier>) -> Expr {
                 .map(|p| make_identifier(p.clone()))
                 .collect();
             let env = params.iter().cloned().chain(env.clone()).collect();
-            let body = compile_impl(&expr.body, env);
-            Expr::Fn(FnExpression { params, body }.into())
+            let (body, body_cs) = compile_impl(&expr.body, env);
+            (Expr::Fn(FnExpression { params, body }.into()), body_cs)
         }
         Expression::App(name, args) => {
             let id = env
@@ -191,93 +207,130 @@ fn compile_impl(expr: &Expression, env: Vec<Identifier>) -> Expr {
                 .ok_or_else(|| format!("Identifier {} not found", name))
                 .unwrap()
                 .clone();
-            Expr::App(
-                id,
-                args.iter().map(|e| compile_impl(e, env.clone())).collect(),
+            let (args, cs): (Vec<_>, Vec<_>) =
+                args.iter().map(|e| compile_impl(e, env.clone())).unzip();
+            (Expr::App(id, args), cs.into_iter().flatten().collect())
+        }
+        Expression::If(expr) => {
+            let (condition, condition_cs) = compile_impl(&expr.condition, env.clone());
+            let (then, then_cs) = compile_impl(&expr.then, env.clone());
+            let (other, other_cs) = compile_impl(&expr.other, env.clone());
+            (
+                Expr::If(
+                    IfExpression {
+                        condition,
+                        then,
+                        other,
+                    }
+                    .into(),
+                ),
+                condition_cs
+                    .into_iter()
+                    .chain(then_cs)
+                    .chain(other_cs)
+                    .collect(),
             )
         }
-        Expression::If(expr) => Expr::If(
-            IfExpression {
-                condition: compile_impl(&expr.condition, env.clone()),
-                then: compile_impl(&expr.then, env.clone()),
-                other: compile_impl(&expr.other, env.clone()),
-            }
-            .into(),
-        ),
-        Expression::Comparison(expr) => Expr::Comparison(
-            ComparisonExpression {
-                op: expr.op.clone(),
-                left: compile_impl(&expr.left, env.clone()),
-                right: compile_impl(&expr.right, env.clone()),
-            }
-            .into(),
-        ),
-        Expression::Logical(expr) => Expr::Logical(
-            LogicalExpression {
-                op: expr.op.clone(),
-                left: compile_impl(&expr.left, env.clone()),
-                right: compile_impl(&expr.right, env.clone()),
-            }
-            .into(),
-        ),
-        Expression::Not(expr) => Expr::Not(compile_impl(expr, env.clone()).into()),
+        Expression::Comparison(expr) => {
+            let (left, left_cs) = compile_impl(&expr.left, env.clone());
+            let (right, right_cs) = compile_impl(&expr.right, env.clone());
+            (
+                Expr::Comparison(
+                    ComparisonExpression {
+                        op: expr.op.clone(),
+                        left,
+                        right,
+                    }
+                    .into(),
+                ),
+                left_cs.into_iter().chain(right_cs).collect(),
+            )
+        }
+        Expression::Logical(expr) => {
+            let (left, left_cs) = compile_impl(&expr.left, env.clone());
+            let (right, right_cs) = compile_impl(&expr.right, env.clone());
+            (
+                Expr::Logical(
+                    LogicalExpression {
+                        op: expr.op.clone(),
+                        left,
+                        right,
+                    }
+                    .into(),
+                ),
+                left_cs.into_iter().chain(right_cs).collect(),
+            )
+        }
+        Expression::Not(expr) => {
+            let (expr, cs) = compile_impl(expr, env.clone());
+            (Expr::Not(expr.into()), cs)
+        }
     }
 }
 
-pub(crate) fn compile(expr: &Expression) -> Expr {
+pub(crate) fn compile(expr: &Expression) -> (Expr, Vec<(Identifier, String)>) {
     compile_impl(expr, Vec::new())
 }
 
-pub(crate) fn compile_with_env(expr: &Expression, env: Vec<Identifier>) -> Expr {
+pub(crate) fn compile_with_env(
+    expr: &Expression,
+    env: Vec<Identifier>,
+) -> (Expr, Vec<(Identifier, String)>) {
     compile_impl(expr, env)
 }
 
 pub(crate) fn compile_program(prog: &ast::AstProgram, env: Vec<Identifier>) -> AstProgram {
-    let (items, _) = prog.items.iter().fold(
-        (Vec::<AstDeclaration>::new(), env),
-        |(mut decls, mut env), decl| {
-            let item = compile_declaration(decl, env.clone());
+    let (items, constants, _) = prog.items.iter().fold(
+        (Vec::<AstDeclaration>::new(), Vec::new(), env),
+        |(mut decls, mut constants, mut env), decl| {
+            let (item, cs) = compile_declaration(decl, env.clone());
             let decl_name = match &item {
                 AstDeclaration::Fn(f) => &f.name,
                 AstDeclaration::Let(l) => &l.name,
             };
             env.insert(0, decl_name.clone());
             decls.push(item);
-            (decls, env)
+            constants.extend(cs);
+            (decls, constants, env)
         },
     );
-    AstProgram { items }
+    AstProgram { items, constants }
 }
 
 pub(crate) fn compile_statement_list(
     stmts: &[ast::AstStatement],
     env: Vec<Identifier>,
-) -> Vec<AstStatement> {
-    let (_, list) = stmts
-        .iter()
-        .fold((env, Vec::new()), |(mut env, mut list), stmt| {
+) -> (Vec<AstStatement>, Vec<(Identifier, String)>) {
+    let (_, list, constants) = stmts.iter().fold(
+        (env, Vec::new(), Vec::new()),
+        |(mut env, mut list, mut constants), stmt| {
             match stmt {
                 ast::AstStatement::Let(let_decl) => {
                     let ident = make_identifier(let_decl.name.to_string());
+                    let (value, cs) = compile_impl(&let_decl.value, env.clone());
                     list.push(AstStatement::Let(AstLetDeclaration {
                         name: ident.clone(),
-                        value: compile_impl(&let_decl.value, env.clone()),
+                        value,
                     }));
+                    constants.extend(cs);
                     env.push(ident);
                 }
                 ast::AstStatement::Expr(expr) => {
-                    list.push(AstStatement::Expr(compile_impl(&expr, env.clone())));
+                    let (expr, cs) = compile_impl(&expr, env.clone());
+                    constants.extend(cs);
+                    list.push(AstStatement::Expr(expr));
                 }
             }
-            (env, list)
-        });
-    list
+            (env, list, constants)
+        },
+    );
+    (list, constants)
 }
 
 pub(crate) fn compile_declaration(
     decl: &ast::AstDeclaration,
     env: Vec<Identifier>,
-) -> AstDeclaration {
+) -> (AstDeclaration, Vec<(Identifier, String)>) {
     match decl {
         ast::AstDeclaration::Fn(fn_decl) => {
             let fn_ident = make_identifier(fn_decl.name.to_string());
@@ -291,20 +344,24 @@ pub(crate) fn compile_declaration(
                 .chain(params.iter().map(|(ident, _)| ident.clone()))
                 .chain(env)
                 .collect();
-            let stmts = compile_statement_list(&fn_decl.body, env.clone());
-            AstDeclaration::Fn(AstFnDeclaration {
-                name: fn_ident.clone(),
-                params,
-                typ: fn_decl.typ.clone(),
-                body: stmts,
-            })
+            let (stmts, cs) = compile_statement_list(&fn_decl.body, env.clone());
+            (
+                AstDeclaration::Fn(AstFnDeclaration {
+                    name: fn_ident.clone(),
+                    params,
+                    typ: fn_decl.typ.clone(),
+                    body: stmts,
+                }),
+                cs,
+            )
         }
         ast::AstDeclaration::Let(let_decl) => {
             let ident = make_identifier(let_decl.name.to_string());
-            AstDeclaration::Let(AstLetDeclaration {
-                name: ident,
-                value: compile_impl(&let_decl.value, env),
-            })
+            let (value, cs) = compile_impl(&let_decl.value, env);
+            (
+                AstDeclaration::Let(AstLetDeclaration { name: ident, value }),
+                cs,
+            )
         }
     }
 }

@@ -13,7 +13,7 @@ type ExeCodeFn = extern "system" fn() -> usize;
 
 pub(crate) fn run_code_native(code: &str) -> u32 {
     let prog = parse_expr_code(code);
-    let expr = resolution::compile_with_env(&prog, vec![]);
+    let (expr, _) = resolution::compile_with_env(&prog, vec![]);
     let instrs = compile::compile(expr);
     let bytes = compile(instrs);
     let mut mem = MmapOptions::new().len(bytes.len()).map_anon().unwrap();
@@ -166,6 +166,8 @@ pub(crate) fn compile(instrs: Vec<super::Instruction>) -> Vec<u8> {
             super::Instruction::SysCall(ident, len) => {
                 todo!()
             }
+            super::Instruction::Ldstr(_) => todo!(),
+            super::Instruction::Bytes(_) => todo!(),
         }
     }
     asm.assemble(0)

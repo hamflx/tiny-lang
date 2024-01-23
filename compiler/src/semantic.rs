@@ -302,7 +302,7 @@ fn test_check_expr() {
         integer(1),
         integer(2),
     );
-    let expr = resolution::compile(&expr);
+    let (expr, _) = resolution::compile(&expr);
     let (typ, constraints) = check_expr(Vec::new(), &expr);
     let subst = solve(constraints.clone());
     println!("typ: {:#?}", typ);

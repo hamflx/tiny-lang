@@ -1,6 +1,7 @@
 #[derive(Debug)]
 pub(crate) enum Instruction {
     Const,
+    Ldstr,
     Add,
     Sub,
     Mul,
@@ -45,6 +46,7 @@ impl Instruction {
             Instruction::And => 17,
             Instruction::Or => 18,
             Instruction::Not => 19,
+            Instruction::Ldstr => 20,
         }
     }
 }
@@ -74,6 +76,7 @@ impl TryFrom<u32> for Instruction {
             17 => Ok(Instruction::And),
             18 => Ok(Instruction::Or),
             19 => Ok(Instruction::Not),
+            20 => Ok(Instruction::Ldstr),
             _ => Err("invalid instruction"),
         }
     }
@@ -113,7 +116,7 @@ impl SysCall {
 
 pub(crate) struct VmStack {
     sp: u32,
-    stack: Vec<u32>,
+    stack: Vec<u64>,
 }
 
 impl VmStack {
@@ -124,12 +127,12 @@ impl VmStack {
         }
     }
 
-    pub(crate) fn push(&mut self, i: u32) {
+    pub(crate) fn push(&mut self, i: u64) {
         self.sp += 1;
         self.stack[self.sp as usize] = i;
     }
 
-    pub(crate) fn pop(&mut self) -> u32 {
+    pub(crate) fn pop(&mut self) -> u64 {
         let i = self.stack[self.sp as usize];
         self.sp -= 1;
         i
@@ -161,15 +164,22 @@ impl Vm {
         self.sys_calls.push(sys_call);
     }
 
-    pub(crate) fn start(&mut self) -> u32 {
+    pub(crate) fn start(&mut self) -> u64 {
         loop {
             let instr = self.code[self.pc as usize];
             let instr: Instruction = instr.try_into().unwrap();
             match instr {
                 Instruction::Const => {
                     let operand = self.code[self.pc as usize + 1];
-                    self.stack.push(operand);
+                    self.stack.push(operand as _);
                     self.pc += 2;
+                }
+                Instruction::Ldstr => {
+                    let operand = self.operand();
+                    self.stack.push(unsafe {
+                        &self.code[operand as usize] as *const u32 as *const u8
+                    } as _);
+                    self.pc += 1;
                 }
                 Instruction::Add => {
                     let op1 = self.stack.pop();
@@ -203,7 +213,7 @@ impl Vm {
                 }
                 Instruction::Call => {
                     let ret_addr = self.pc + 3;
-                    self.push(ret_addr);
+                    self.push(ret_addr as _);
 
                     let target = self.code[self.pc as usize + 1];
                     let _ = self.code[self.pc as usize + 2];
@@ -215,18 +225,18 @@ impl Vm {
                     let syscall = &self.sys_calls[call_no as usize];
                     let result = match len {
                         0 => {
-                            (unsafe { std::mem::transmute::<_, fn(&SysCall) -> u32>(syscall.ptr) })(
+                            (unsafe { std::mem::transmute::<_, fn(&SysCall) -> u64>(syscall.ptr) })(
                                 syscall,
                             )
                         }
                         1 => (unsafe {
-                            std::mem::transmute::<_, fn(&SysCall, u32) -> u32>(syscall.ptr)
+                            std::mem::transmute::<_, fn(&SysCall, u64) -> u64>(syscall.ptr)
                         })(syscall, self.stack.pop()),
                         2 => {
                             let p2 = self.stack.pop();
                             let p1 = self.stack.pop();
                             (unsafe {
-                                std::mem::transmute::<_, fn(&SysCall, u32, u32) -> u32>(syscall.ptr)
+                                std::mem::transmute::<_, fn(&SysCall, u64, u64) -> u64>(syscall.ptr)
                             })(syscall, p1, p2)
                         }
                         _ => todo!(),
@@ -243,7 +253,7 @@ impl Vm {
                     self.stack.sp -= n;
 
                     self.push(ret_value);
-                    self.pc = ret_addr;
+                    self.pc = ret_addr as u32;
                 }
                 Instruction::Goto => {
                     let target_addr = self.operand();
@@ -271,53 +281,53 @@ impl Vm {
                 Instruction::Le => {
                     let b = self.pop();
                     let a = self.pop();
-                    self.push((a <= b) as u32);
+                    self.push((a <= b) as _);
                     self.pc += 1;
                 }
                 Instruction::Ge => {
                     let b = self.pop();
                     let a = self.pop();
-                    self.push((a >= b) as u32);
+                    self.push((a >= b) as _);
                     self.pc += 1;
                 }
                 Instruction::Lt => {
                     let b = self.pop();
                     let a = self.pop();
-                    self.push((a < b) as u32);
+                    self.push((a < b) as _);
                     self.pc += 1;
                 }
                 Instruction::Gt => {
                     let b = self.pop();
                     let a = self.pop();
-                    self.push((a > b) as u32);
+                    self.push((a > b) as _);
                     self.pc += 1;
                 }
                 Instruction::And => {
                     let b = self.pop() != 0;
                     let a = self.pop() != 0;
-                    self.push((a && b) as u32);
+                    self.push((a && b) as _);
                     self.pc += 1;
                 }
                 Instruction::Or => {
                     let b = self.pop() != 0;
                     let a = self.pop() != 0;
-                    self.push((a || b) as u32);
+                    self.push((a || b) as _);
                     self.pc += 1;
                 }
                 Instruction::Not => {
                     let a = self.pop() != 0;
-                    self.push(!a as u32);
+                    self.push(!a as _);
                     self.pc += 1;
                 }
             }
         }
     }
 
-    fn push(&mut self, value: u32) {
+    fn push(&mut self, value: u64) {
         self.stack.push(value)
     }
 
-    fn pop(&mut self) -> u32 {
+    fn pop(&mut self) -> u64 {
         self.stack.pop()
     }
 

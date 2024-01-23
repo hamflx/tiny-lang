@@ -21,6 +21,23 @@ pub(crate) fn compile(instrs: Vec<super::Instruction>) -> Vec<u8> {
     let instrs = instrs.into_iter().fold(Vec::new(), |mut instrs, instr| {
         match instr {
             super::Instruction::Label(_) => {}
+            super::Instruction::Bytes(b) => {
+                instrs.extend(
+                    b.into_iter()
+                        .chain([0u8])
+                        .collect::<Vec<_>>()
+                        .chunks(4)
+                        .map(|bs| {
+                            let mut buf = [0; 4];
+                            buf[..bs.len()].copy_from_slice(bs);
+                            u32::from_le_bytes(buf)
+                        }),
+                );
+            }
+            super::Instruction::Ldstr(ident) => {
+                let addr = label_map[&ident];
+                instrs.extend([vm::Instruction::Ldstr.code(), addr as u32])
+            }
             super::Instruction::Add => instrs.push(vm::Instruction::Add.code()),
             super::Instruction::Sub => instrs.push(vm::Instruction::Sub.code()),
             super::Instruction::Mul => instrs.push(vm::Instruction::Mul.code()),
@@ -77,7 +94,7 @@ fn test_compile() {
         ),
         app_fn("add", &[integer(3), integer(25)]),
     );
-    let expr = resolution::compile(&expr);
+    let (expr, _) = resolution::compile(&expr);
     let instrs = super::compile(expr);
     let bytecode = compile(instrs);
     let mut vm = vm::Vm::create(bytecode);
@@ -90,7 +107,7 @@ fn test_compile() {
 #[test]
 fn test_compile_if_else() {
     let expr = if_expr(op_lt(integer(3), integer(2)), integer(6), integer(7));
-    let expr = resolution::compile(&expr);
+    let (expr, _) = resolution::compile(&expr);
     let instrs = super::compile(expr);
     let bytecode = compile(instrs);
     let mut vm = vm::Vm::create(bytecode);
@@ -103,7 +120,7 @@ fn test_compile_if_else() {
 #[test]
 fn test_compile_if_then() {
     let expr = if_expr(op_lt(integer(3), integer(5)), integer(6), integer(7));
-    let expr = resolution::compile(&expr);
+    let (expr, _) = resolution::compile(&expr);
     let instrs = super::compile(expr);
     let bytecode = compile(instrs);
     let mut vm = vm::Vm::create(bytecode);
