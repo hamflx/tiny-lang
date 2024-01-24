@@ -1,3 +1,4 @@
+pub(crate) mod assemble;
 pub(crate) mod bytecode;
 pub(crate) mod native;
 
