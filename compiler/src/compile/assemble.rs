@@ -14,6 +14,7 @@ pub(crate) enum Reg {
     Rcx,
     Rdx,
     Rsp,
+    Rdi,
 }
 
 impl std::fmt::Display for Reg {
@@ -25,6 +26,7 @@ impl std::fmt::Display for Reg {
             Reg::Rcx => write!(f, "rcx"),
             Reg::Rdx => write!(f, "rdx"),
             Reg::Rsp => write!(f, "rsp"),
+            Reg::Rdi => write!(f, "rdi"),
         }
     }
 }
@@ -94,6 +96,7 @@ pub(crate) enum Instruction {
     Retn(usize),
     Ret,
     Int(usize),
+    SysCall,
     Label(Identifier),
     Call(Identifier),
     Goto(Identifier),
@@ -283,10 +286,9 @@ pub(crate) fn translate(instrs: Vec<super::Instruction>) -> Vec<Instruction> {
             ]
             .to_vec(),
             super::Instruction::Exit => [
-                Instruction::Pop(Reg::Rbx),
-                Instruction::Mov(Reg::Rax, MoveArg::Constant(1)),
-                // Instruction::Mov(Reg::Ebx, MoveArg::Constant(0)),
-                Instruction::Int(0x80),
+                Instruction::Pop(Reg::Rdi),
+                Instruction::Mov(Reg::Rax, MoveArg::Constant(60)),
+                Instruction::SysCall,
             ]
             .to_vec(),
         };
@@ -327,6 +329,7 @@ pub(crate) fn compile(instrs: Vec<Instruction>) -> String {
             Instruction::Setae(op) => format!("setae {op}"),
             Instruction::Seta(op) => format!("seta {op}"),
             Instruction::Int(no) => format!("int 0x{:x}", no),
+            Instruction::SysCall => format!("syscall"),
         };
         asm_result.push_str(&asm_text);
         asm_result.push('\n');
