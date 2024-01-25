@@ -5,8 +5,8 @@ pub(crate) mod native;
 use crate::{
     ast::{BinaryOperator, ComparisonOperator, LogicalOperator},
     resolution::{
-        self, make_identifier, AstStatement, BinaryExpression, ComparisonExpression, Expr,
-        Identifier, IfExpression, LetExpression, LogicalExpression,
+        self, make_identifier, make_raw_identifier, AstStatement, BinaryExpression,
+        ComparisonExpression, Expr, Identifier, IfExpression, LetExpression, LogicalExpression,
     },
     utils::expression::{app_fn, integer, let_expr, let_fn, op_add, op_mul, op_sub, var},
 };
@@ -483,23 +483,21 @@ pub(crate) fn compile_program(prog: resolution::AstProgram) -> Vec<Instruction> 
         .find(|f| f.ident.name == "main")
         .ok_or("No `main`")
         .unwrap();
-    let start_ident = make_identifier("start".to_string());
-    let start_fun = Fun {
-        ident: start_ident.clone(),
-        body: vec![AstStatement::Expr(Expr::App(main.ident.clone(), vec![]))],
-        params: Vec::new(),
-    };
-    let fun_instrs = [start_fun]
+    let main_ident = main.ident.clone();
+    let fun_instrs = fun_list
         .into_iter()
-        .chain(fun_list)
         .map(|f| compile_fun(f))
         .flatten()
         .collect::<Vec<_>>();
-    [Instruction::Call(start_ident, 0), Instruction::Exit]
-        .into_iter()
-        .chain(fun_instrs)
-        .chain(constants)
-        .collect()
+    [
+        Instruction::Label(make_raw_identifier("_start".to_string())),
+        Instruction::Call(main_ident, 0),
+        Instruction::Exit,
+    ]
+    .into_iter()
+    .chain(fun_instrs)
+    .chain(constants)
+    .collect()
 }
 
 #[test]

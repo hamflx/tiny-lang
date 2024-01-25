@@ -93,6 +93,7 @@ pub(crate) enum Instruction {
     Seta(Reg),
     Retn(usize),
     Ret,
+    Int(usize),
     Label(Identifier),
     Call(Identifier),
     Goto(Identifier),
@@ -101,21 +102,56 @@ pub(crate) enum Instruction {
 
 #[test]
 fn test_emit_assembly() {
-    emit_assembly_code("fn main () -> usize {10085 + 1}");
+    assert_eq!(run("fn main () -> usize {3 + 1}"), 4);
 }
 
-pub(crate) fn emit_assembly_code(code: &str) {
+pub(crate) fn run(code: &str) -> u64 {
     let prog = parse_code(code);
     let prog = resolution::compile_program(&prog, vec![]);
     let instrs = compile::compile_program(prog);
     let instrs = translate(instrs);
     let bytes = compile(instrs);
-
-    std::fs::write("machine_code.s", bytes.as_bytes()).unwrap();
-    Command::new("clang")
-        .args(["-c", "machine_code.s", "-o", "machine_code.o"])
+    let dir = std::env::current_dir().unwrap();
+    let asm_path = dir.join("machine_code.s");
+    let obj_path = dir.join("machine_code.o");
+    let exe_path = dir.join("machine_code");
+    std::fs::write(&asm_path, bytes.as_bytes()).unwrap();
+    let output = String::from_utf8(
+        Command::new("clang")
+            .args([
+                "-nostdlib",
+                "-c",
+                format!("{}", asm_path.display()).as_str(),
+                "-o",
+                format!("{}", obj_path.display()).as_str(),
+            ])
+            .output()
+            .unwrap()
+            .stdout,
+    )
+    .unwrap();
+    println!("{}", output);
+    let output = String::from_utf8(
+        Command::new("clang")
+            .args([
+                "-nostdlib",
+                format!("{}", obj_path.display()).as_str(),
+                "-o",
+                format!("{}", exe_path.display()).as_str(),
+            ])
+            .output()
+            .unwrap()
+            .stdout,
+    )
+    .unwrap();
+    println!("{}", output);
+    Command::new(exe_path)
         .spawn()
-        .unwrap();
+        .unwrap()
+        .wait()
+        .unwrap()
+        .code()
+        .unwrap() as _
 }
 
 pub(crate) fn translate(instrs: Vec<super::Instruction>) -> Vec<Instruction> {
@@ -246,7 +282,13 @@ pub(crate) fn translate(instrs: Vec<super::Instruction>) -> Vec<Instruction> {
                 Instruction::Je(addr),
             ]
             .to_vec(),
-            super::Instruction::Exit => [Instruction::Pop(Reg::Rax), Instruction::Ret].to_vec(),
+            super::Instruction::Exit => [
+                Instruction::Pop(Reg::Rbx),
+                Instruction::Mov(Reg::Rax, MoveArg::Constant(1)),
+                // Instruction::Mov(Reg::Ebx, MoveArg::Constant(0)),
+                Instruction::Int(0x80),
+            ]
+            .to_vec(),
         };
         list.extend(extend);
         list
@@ -260,11 +302,8 @@ pub(crate) fn compile(instrs: Vec<Instruction>) -> String {
             Instruction::Label(ident) => {
                 // #[cfg(not(target_os = "linux"))]
                 #[cfg(target_os = "linux")]
-                let modifiers = format!(
-                    ".type {}_{},@function\n.global {}_{}\n",
-                    ident.name, ident.stamp, ident.name, ident.stamp
-                );
-                format!("{}{}_{}:", modifiers, ident.name, ident.stamp)
+                let modifiers = format!(".type {},@function\n.global {}\n", ident, ident);
+                format!("{}{}:", modifiers, ident)
             }
             Instruction::Mov(reg, arg) => format!("mov {}, {}", reg, arg),
             Instruction::Movzx(reg, arg) => format!("mov {}, {}", reg, arg),
@@ -287,6 +326,7 @@ pub(crate) fn compile(instrs: Vec<Instruction>) -> String {
             Instruction::Setnae(op) => format!("setnae {op}"),
             Instruction::Setae(op) => format!("setae {op}"),
             Instruction::Seta(op) => format!("seta {op}"),
+            Instruction::Int(no) => format!("int 0x{:x}", no),
         };
         asm_result.push_str(&asm_text);
         asm_result.push('\n');

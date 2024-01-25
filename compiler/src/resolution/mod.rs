@@ -12,6 +12,15 @@ pub(crate) struct Identifier {
     pub(crate) stamp: usize,
 }
 
+impl std::fmt::Display for Identifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.stamp {
+            usize::MAX => write!(f, "{}", self.name),
+            n => write!(f, "{}_{}", self.name, n),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct AstProgram {
     pub(crate) items: Vec<AstDeclaration>,
@@ -139,6 +148,13 @@ static LAST_IDENTIFIER_STAMP: AtomicUsize = AtomicUsize::new(0);
 pub(crate) fn make_identifier(name: String) -> Identifier {
     let stamp = LAST_IDENTIFIER_STAMP.fetch_add(1, Ordering::Relaxed);
     Identifier { name, stamp }
+}
+
+pub(crate) fn make_raw_identifier(name: String) -> Identifier {
+    Identifier {
+        name,
+        stamp: usize::MAX,
+    }
 }
 
 fn compile_impl(expr: &Expression, env: Vec<Identifier>) -> (Expr, Vec<(Identifier, String)>) {
