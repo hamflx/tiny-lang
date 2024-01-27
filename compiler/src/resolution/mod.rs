@@ -12,6 +12,20 @@ pub(crate) struct Identifier {
     pub(crate) stamp: usize,
 }
 
+impl Identifier {
+    pub(crate) fn new_seq(name: String) -> Self {
+        let stamp = LAST_IDENTIFIER_STAMP.fetch_add(1, Ordering::Relaxed);
+        Self { name, stamp }
+    }
+
+    pub(crate) fn new_raw(name: String) -> Self {
+        Self {
+            name,
+            stamp: usize::MAX,
+        }
+    }
+}
+
 impl std::fmt::Display for Identifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.stamp {
@@ -349,7 +363,10 @@ pub(crate) fn compile_declaration(
 ) -> (AstDeclaration, Vec<(Identifier, String)>) {
     match decl {
         ast::AstDeclaration::Fn(fn_decl) => {
-            let fn_ident = make_identifier(fn_decl.name.to_string());
+            let fn_ident = match fn_decl.name.as_str() {
+                "main" => Identifier::new_raw(fn_decl.name.to_string()),
+                _ => Identifier::new_seq(fn_decl.name.to_string()),
+            };
             let params: Vec<_> = fn_decl
                 .params
                 .iter()

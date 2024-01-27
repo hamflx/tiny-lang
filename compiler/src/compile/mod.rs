@@ -1,5 +1,6 @@
 pub(crate) mod assemble;
 pub(crate) mod bytecode;
+pub(crate) mod llvm;
 pub(crate) mod native;
 
 use crate::{
