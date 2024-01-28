@@ -134,8 +134,8 @@ pub(crate) struct LessEqualExpression {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct IfExpression {
     pub(crate) condition: Expr,
-    pub(crate) then: Expr,
-    pub(crate) other: Expr,
+    pub(crate) consequence: Expr,
+    pub(crate) alternative: Expr,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -249,8 +249,8 @@ fn compile_impl(expr: &Expression, env: Vec<Identifier>) -> (Expr, Vec<(Identifi
                 Expr::If(
                     IfExpression {
                         condition,
-                        then,
-                        other,
+                        consequence: then,
+                        alternative: other,
                     }
                     .into(),
                 ),

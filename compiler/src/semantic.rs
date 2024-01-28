@@ -11,7 +11,7 @@ type Constraints = Vec<(Typ, Typ)>;
 
 type Context = Vec<(resolution::Identifier, Typ)>;
 
-type Substituation = Vec<(usize, Typ)>;
+pub(crate) type Substituation = Vec<(usize, Typ)>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Typ {
@@ -227,8 +227,8 @@ pub(crate) fn check_expr(ctx: Context, expr: &resolution::Expr) -> (Typ, Constra
         resolution::Expr::If(expr) => {
             let t = new_var();
             let (cond_typ, cond_cs) = check_expr(ctx.clone(), &expr.condition);
-            let (then_typ, then_cs) = check_expr(ctx.clone(), &expr.then);
-            let (other_typ, other_cs) = check_expr(ctx, &expr.other);
+            let (then_typ, then_cs) = check_expr(ctx.clone(), &expr.consequence);
+            let (other_typ, other_cs) = check_expr(ctx, &expr.alternative);
             (
                 t.clone(),
                 Vec::from([

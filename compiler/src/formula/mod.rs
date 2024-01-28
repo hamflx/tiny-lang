@@ -40,8 +40,8 @@ fn replace_var_with_call(
         resolution::Expr::If(expr) => resolution::Expr::If(
             resolution::IfExpression {
                 condition: replace_var_with_call(expr.condition, get_ident.clone(), table),
-                then: replace_var_with_call(expr.then, get_ident.clone(), table),
-                other: replace_var_with_call(expr.other, get_ident.clone(), table),
+                consequence: replace_var_with_call(expr.consequence, get_ident.clone(), table),
+                alternative: replace_var_with_call(expr.alternative, get_ident.clone(), table),
             }
             .into(),
         ),

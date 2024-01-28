@@ -79,14 +79,14 @@ fn extract_fun(expr: Expr) -> (Expr, Vec<Fun>) {
         }
         Expr::If(e) => {
             let (condition, funs_cond) = extract_fun(e.condition);
-            let (then, funs_then) = extract_fun(e.then);
-            let (other, funs_other) = extract_fun(e.other);
+            let (then, funs_then) = extract_fun(e.consequence);
+            let (other, funs_other) = extract_fun(e.alternative);
             (
                 Expr::If(
                     IfExpression {
                         condition,
-                        then,
-                        other,
+                        consequence: then,
+                        alternative: other,
                     }
                     .into(),
                 ),
@@ -334,8 +334,8 @@ fn compile_expr(expr: Expr, stack: Vec<StackValue>) -> Vec<Instruction> {
         }
         Expr::If(expr) => {
             let cond_instrs = compile_expr(expr.condition, stack.clone());
-            let then_instrs = compile_expr(expr.then, stack.clone());
-            let other_instrs = compile_expr(expr.other, stack);
+            let then_instrs = compile_expr(expr.consequence, stack.clone());
+            let other_instrs = compile_expr(expr.alternative, stack);
             let other_ident = resolution::make_identifier("if_other".to_string());
             let end_ident = resolution::make_identifier("if_end".to_string());
             cond_instrs

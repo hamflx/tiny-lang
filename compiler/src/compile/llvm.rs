@@ -4,11 +4,17 @@ use inkwell::{
     builder::Builder,
     context::Context,
     module::Module,
-    types::BasicMetadataTypeEnum,
+    types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum},
     values::{BasicValue, BasicValueEnum, FunctionValue, PointerValue},
+    IntPredicate,
 };
 
-use crate::{parser::parse_code, resolution};
+use crate::{
+    ast,
+    parser::parse_code,
+    resolution,
+    semantic::{check_program, solve, Substituation, Typ},
+};
 
 use super::Fun;
 
@@ -33,13 +39,15 @@ pub(crate) fn compile_exe(code: &str, base_path: &Path, output_path: &Path) {
     let ir_path = base_path.with_extension("ll");
     let prog = parse_code(code);
     let prog = resolution::compile_program(&prog, Vec::new());
+    let constraints = check_program(Vec::new(), &prog);
+    let subst = solve(constraints);
     let context = Context::create();
     let builder = context.create_builder();
     let module = context.create_module("tmp");
     for i in prog.items {
         match i {
             resolution::AstDeclaration::Fn(func) => {
-                let mut compiler = Compiler::new(&context, &builder, &module, &func);
+                let mut compiler = Compiler::new(&context, &builder, &module, &func, &subst);
                 compiler.compile(&func);
                 module.print_to_file(&ir_path).unwrap();
             }
@@ -77,6 +85,7 @@ struct Compiler<'a, 'ctx> {
     module: &'a Module<'ctx>,
     function: &'a resolution::AstFnDeclaration,
     fn_value_opt: Option<FunctionValue<'ctx>>,
+    subst: &'a Substituation,
 }
 
 impl<'a, 'ctx> Compiler<'a, 'ctx> {
@@ -85,6 +94,7 @@ impl<'a, 'ctx> Compiler<'a, 'ctx> {
         builder: &'a Builder<'ctx>,
         module: &'a Module<'ctx>,
         function: &'a resolution::AstFnDeclaration,
+        subst: &'a Substituation,
     ) -> Self {
         Self {
             context,
@@ -92,6 +102,7 @@ impl<'a, 'ctx> Compiler<'a, 'ctx> {
             module,
             function,
             fn_value_opt: None,
+            subst,
         }
     }
 
@@ -101,19 +112,34 @@ impl<'a, 'ctx> Compiler<'a, 'ctx> {
 
     fn compile_let_statement(
         &self,
-        env: &mut Vec<(resolution::Identifier, BasicValueEnum<'ctx>)>,
+        env: &mut Vec<(resolution::Identifier, PointerValue<'ctx>)>,
         stmt: &resolution::AstLetDeclaration,
     ) {
-        todo!()
+        let value = self.compile_expr(env, &stmt.value).unwrap();
+        // todo typ
+        let alloc = self.create_entry_block_alloca(&stmt.name.to_string(), Typ::Int);
+        self.builder.build_store(alloc, value).unwrap();
+        env.insert(0, (stmt.name.clone(), alloc));
     }
 
     fn compile_expr(
         &self,
-        env: &mut Vec<(resolution::Identifier, BasicValueEnum<'ctx>)>,
+        env: &mut Vec<(resolution::Identifier, PointerValue<'ctx>)>,
         expr: &resolution::Expr,
     ) -> Option<BasicValueEnum<'ctx>> {
         match expr {
-            resolution::Expr::Var(_) => todo!(),
+            resolution::Expr::Var(v) => {
+                let (ident, ptr) = env
+                    .iter()
+                    .find(|(ident, _)| ident == v)
+                    .ok_or_else(|| format!("No variable named: {}", v))
+                    .unwrap();
+                Some(
+                    self.builder
+                        .build_load(*ptr, &format!("{}", ident))
+                        .unwrap(),
+                )
+            }
             resolution::Expr::CstI(v) => {
                 Some(self.context.i64_type().const_int(*v as _, *v < 0).into())
             }
@@ -124,8 +150,49 @@ impl<'a, 'ctx> Compiler<'a, 'ctx> {
             resolution::Expr::TimeSpan(_) => todo!(),
             resolution::Expr::Fn(_) => todo!(),
             resolution::Expr::Let(_) => todo!(),
-            resolution::Expr::App(_, _) => todo!(),
-            resolution::Expr::If(_) => todo!(),
+            resolution::Expr::App(ident, args) => {
+                let compiled_args = args
+                    .iter()
+                    .map(|arg| self.compile_expr(env, arg).unwrap().into())
+                    .collect::<Vec<_>>();
+                let fun = self.module.get_function(&format!("{}", ident)).unwrap();
+                self.builder
+                    .build_call(fun, &compiled_args, "tmp")
+                    .unwrap()
+                    .try_as_basic_value()
+                    .left()
+            }
+            resolution::Expr::If(expr) => {
+                let cond = self
+                    .compile_expr(env, &expr.condition)
+                    .unwrap()
+                    .into_int_value();
+                let fun = self.fn_value();
+                let then_block = self.context.append_basic_block(fun, "then");
+                let else_block = self.context.append_basic_block(fun, "else");
+                let cont_block = self.context.append_basic_block(fun, "ifcont");
+                self.builder
+                    .build_conditional_branch(cond, then_block, else_block)
+                    .unwrap();
+
+                self.builder.position_at_end(then_block);
+                let then_val = self.compile_expr(env, &expr.consequence).unwrap();
+                self.builder.build_unconditional_branch(cont_block).unwrap();
+
+                self.builder.position_at_end(else_block);
+                let else_val = self.compile_expr(env, &expr.alternative).unwrap();
+                self.builder.build_unconditional_branch(cont_block).unwrap();
+
+                self.builder.position_at_end(cont_block);
+                // todo type
+                let phi = self
+                    .builder
+                    .build_phi(self.context.i64_type(), "iftmp")
+                    .unwrap();
+                phi.add_incoming(&[(&then_val, then_block), (&else_val, else_block)]);
+
+                Some(phi.as_basic_value())
+            }
             resolution::Expr::BinaryOperation(expr) => {
                 let lhs = self.compile_expr(env, &expr.left).unwrap();
                 let rhs = self.compile_expr(env, &expr.right).unwrap();
@@ -149,15 +216,45 @@ impl<'a, 'ctx> Compiler<'a, 'ctx> {
                 };
                 Some(val.into())
             }
-            resolution::Expr::Comparison(_) => todo!(),
-            resolution::Expr::Logical(_) => todo!(),
+            resolution::Expr::Comparison(expr) => {
+                let cmp_val = self
+                    .builder
+                    .build_int_compare(
+                        match expr.op {
+                            ast::ComparisonOperator::Lt => IntPredicate::SLT,
+                            ast::ComparisonOperator::Gt => IntPredicate::SGT,
+                            ast::ComparisonOperator::Ge => IntPredicate::SGE,
+                            ast::ComparisonOperator::Le => IntPredicate::SLE,
+                        },
+                        self.compile_expr(env, &expr.left).unwrap().into_int_value(),
+                        self.compile_expr(env, &expr.right)
+                            .unwrap()
+                            .into_int_value(),
+                        "tmpcmp",
+                    )
+                    .unwrap();
+                Some(cmp_val.as_basic_value_enum())
+            }
+            resolution::Expr::Logical(expr) => {
+                let lhs = self.compile_expr(env, &expr.left).unwrap().into_int_value();
+                let rhs = self
+                    .compile_expr(env, &expr.right)
+                    .unwrap()
+                    .into_int_value();
+                let value = match expr.op {
+                    ast::LogicalOperator::And => self.builder.build_and(lhs, rhs, "tmpand"),
+                    ast::LogicalOperator::Or => self.builder.build_or(lhs, rhs, "tmpor"),
+                }
+                .unwrap();
+                Some(value.as_basic_value_enum())
+            }
             resolution::Expr::Not(_) => todo!(),
         }
     }
 
     fn compile_statement(
         &self,
-        env: &mut Vec<(resolution::Identifier, BasicValueEnum<'ctx>)>,
+        env: &mut Vec<(resolution::Identifier, PointerValue<'ctx>)>,
         stmt: &resolution::AstStatement,
     ) -> Option<BasicValueEnum<'ctx>> {
         match stmt {
@@ -185,9 +282,9 @@ impl<'a, 'ctx> Compiler<'a, 'ctx> {
             .enumerate()
             .map(|(i, arg)| {
                 let (ident, typ) = function.params[i].clone();
-                let alloca = self.create_entry_block_alloca(ident.to_string().as_str());
-                self.builder.build_store(alloca, arg);
-                (ident, arg)
+                let alloca = self.create_entry_block_alloca(ident.to_string().as_str(), typ);
+                self.builder.build_store(alloca, arg).unwrap();
+                (ident, alloca)
             })
             .collect::<Vec<_>>();
 
@@ -245,7 +342,7 @@ impl<'a, 'ctx> Compiler<'a, 'ctx> {
     }
 
     /// Creates a new stack allocation instruction in the entry block of the function.
-    fn create_entry_block_alloca(&self, name: &str) -> PointerValue<'ctx> {
+    fn create_entry_block_alloca(&self, name: &str, typ: Typ) -> PointerValue<'ctx> {
         let builder = self.context.create_builder();
 
         let entry = self.fn_value().get_first_basic_block().unwrap();
@@ -255,7 +352,23 @@ impl<'a, 'ctx> Compiler<'a, 'ctx> {
             None => builder.position_at_end(entry),
         }
 
-        builder.build_alloca(self.context.f64_type(), name).unwrap()
+        builder
+            .build_alloca(self.build_basic_type(typ), name)
+            .unwrap()
+    }
+
+    fn build_basic_type(&self, typ: Typ) -> BasicTypeEnum<'ctx> {
+        match typ {
+            Typ::Unit => todo!(),
+            Typ::Int => self.context.i64_type().as_basic_type_enum(),
+            Typ::Bool => self.context.bool_type().as_basic_type_enum(),
+            Typ::Instant => todo!(),
+            Typ::Duration => todo!(),
+            Typ::String => todo!(),
+            Typ::Var(_) => todo!(),
+            Typ::Record(_) => todo!(),
+            Typ::Arrow(_) => todo!(),
+        }
     }
 
     /// Returns the `FunctionValue` representing the function being compiled.
