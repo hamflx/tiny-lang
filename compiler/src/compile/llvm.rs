@@ -18,7 +18,19 @@ fn test_compile_llvm_ir() {
 }
 
 pub(crate) fn compile_and_run(code: &str) -> i64 {
-    let ir_path = std::env::temp_dir().join("tiny-lang-program.ll");
+    let base_path = std::env::current_dir().unwrap().join("tiny-lang-program");
+    compile_exe(code, &base_path, &base_path);
+    Command::new(base_path)
+        .spawn()
+        .unwrap()
+        .wait()
+        .unwrap()
+        .code()
+        .unwrap() as _
+}
+
+pub(crate) fn compile_exe(code: &str, base_path: &Path, output_path: &Path) {
+    let ir_path = base_path.with_extension("ll");
     let prog = parse_code(code);
     let prog = resolution::compile_program(&prog, Vec::new());
     let context = Context::create();
@@ -35,8 +47,7 @@ pub(crate) fn compile_and_run(code: &str) -> i64 {
         }
     }
     let out_dir = ir_path.parent().unwrap();
-    let obj_file = out_dir.join("tiny-lang-program.o");
-    let exe_file = out_dir.join("tiny-lang-program");
+    let obj_file = base_path.with_extension("o");
     Command::new("llc")
         .args([
             "-filetype=obj",
@@ -49,18 +60,15 @@ pub(crate) fn compile_and_run(code: &str) -> i64 {
         .wait()
         .unwrap();
     Command::new("clang")
-        .args([obj_file.to_str().unwrap(), "-o", exe_file.to_str().unwrap()])
+        .args([
+            obj_file.to_str().unwrap(),
+            "-o",
+            output_path.to_str().unwrap(),
+        ])
         .spawn()
         .unwrap()
         .wait()
         .unwrap();
-    Command::new(exe_file)
-        .spawn()
-        .unwrap()
-        .wait()
-        .unwrap()
-        .code()
-        .unwrap() as _
 }
 
 struct Compiler<'a, 'ctx> {

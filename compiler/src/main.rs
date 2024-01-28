@@ -10,11 +10,12 @@ mod vm;
 
 use std::{
     ffi::CStr,
+    path::Path,
     time::{SystemTime, UNIX_EPOCH},
 };
 
 use clap::Parser;
-use compile::build_syscall_stub;
+use compile::{build_syscall_stub, llvm};
 use parser::parse_code;
 use resolution::{make_identifier, Identifier};
 use semantic::{check_expr, solve};
@@ -282,9 +283,10 @@ fn main() {
     let args = Args::parse();
     match args.filename {
         Some(filename) => {
+            let path = Path::new(&filename).canonicalize().unwrap();
+            let base_path = path.parent().unwrap().join(path.file_stem().unwrap());
             let content = std::fs::read_to_string(filename).unwrap();
-            let result = compile_and_run(&content);
-            println!("{}", result);
+            llvm::compile_exe(&content, &base_path, &base_path);
         }
         None => {
             for line in std::io::stdin().lines() {

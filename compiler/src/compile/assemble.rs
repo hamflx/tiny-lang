@@ -1,4 +1,4 @@
-use std::process::Command;
+use std::{path::Path, process::Command};
 
 use crate::{
     compile,
@@ -112,12 +112,28 @@ pub(crate) fn run(code: &str) -> u64 {
     let prog = parse_code(code);
     let prog = resolution::compile_program(&prog, vec![]);
     let instrs = compile::compile_program(prog);
+    let dir = std::env::current_dir().unwrap();
+    let exe_path = dir.join("machine_code");
+    compile_instructions(instrs, &exe_path, &exe_path);
+    Command::new(exe_path)
+        .spawn()
+        .unwrap()
+        .wait()
+        .unwrap()
+        .code()
+        .unwrap() as _
+}
+
+pub(crate) fn compile_instructions(
+    instrs: Vec<super::Instruction>,
+    base_path: &Path,
+    output_path: &Path,
+) {
     let instrs = translate(instrs);
     let bytes = compile(instrs);
     let dir = std::env::current_dir().unwrap();
-    let asm_path = dir.join("machine_code.s");
-    let obj_path = dir.join("machine_code.o");
-    let exe_path = dir.join("machine_code");
+    let asm_path = base_path.with_extension(".s");
+    let obj_path = base_path.with_extension(".obj");
     std::fs::write(&asm_path, bytes.as_bytes()).unwrap();
     let output = String::from_utf8(
         Command::new("clang")
@@ -140,21 +156,13 @@ pub(crate) fn run(code: &str) -> u64 {
                 "-nostdlib",
                 format!("{}", obj_path.display()).as_str(),
                 "-o",
-                format!("{}", exe_path.display()).as_str(),
+                format!("{}", output_path.display()).as_str(),
             ])
             .output()
             .unwrap()
             .stdout,
     )
     .unwrap();
-    println!("{}", output);
-    Command::new(exe_path)
-        .spawn()
-        .unwrap()
-        .wait()
-        .unwrap()
-        .code()
-        .unwrap() as _
 }
 
 pub(crate) fn translate(instrs: Vec<super::Instruction>) -> Vec<Instruction> {
