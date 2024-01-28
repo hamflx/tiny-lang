@@ -1,3 +1,0 @@
-{
-  "rust-analyzer.check.command": "check --features llvm13-0"
-}
