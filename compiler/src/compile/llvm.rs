@@ -8,12 +8,14 @@ use inkwell::{
     values::{BasicValue, BasicValueEnum, FunctionValue, PointerValue},
     IntPredicate,
 };
+use tempfile::tempdir;
 
 use crate::{
     ast,
     parser::parse_code,
     resolution,
     semantic::{check_program, solve, Substituation, Typ},
+    KAITIAN_RUNTIME_LIB,
 };
 
 use super::Fun;
@@ -36,6 +38,11 @@ pub(crate) fn compile_and_run(code: &str) -> i64 {
 }
 
 pub(crate) fn compile_exe(code: &str, base_path: &Path, output_path: &Path) {
+    let rt_name = "kaitian_rt";
+    let rt_dir = tempdir().unwrap();
+    let rt_path = rt_dir.path().join(format!("lib{}.a", rt_name));
+    std::fs::write(rt_path, KAITIAN_RUNTIME_LIB).unwrap();
+
     let ir_path = base_path.with_extension("ll");
     let prog = parse_code(code);
     let prog = resolution::compile_program(&prog, Vec::new());
@@ -69,6 +76,10 @@ pub(crate) fn compile_exe(code: &str, base_path: &Path, output_path: &Path) {
         .unwrap();
     Command::new("clang")
         .args([
+            "-L",
+            rt_dir.path().to_str().unwrap(),
+            "-l",
+            rt_name,
             obj_file.to_str().unwrap(),
             "-o",
             output_path.to_str().unwrap(),

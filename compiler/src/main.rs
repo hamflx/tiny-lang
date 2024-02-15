@@ -26,6 +26,9 @@ use crate::{
     semantic::{apply_subst, check_program, t_arrow, Typ},
 };
 
+const KAITIAN_RUNTIME_LIB: &[u8] =
+    include_bytes!(env!("CARGO_STATICLIB_FILE_KAITIAN_RT_kaitian-rt"));
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SysVariableTable {
     rows: Vec<SysVariableTableRecord>,

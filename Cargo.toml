@@ -2,5 +2,6 @@
 members = [
   "vm",
   "shellcode",
-  "compiler"
+  "compiler",
+  "kaitian-rt"
 ]
